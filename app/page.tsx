@@ -8,7 +8,8 @@ import {
 import {
   Download, TrendingUp, TrendingDown, Users, Eye, Heart,
   MessageCircle, Share2, DollarSign, Target, Youtube,
-  Twitter, Linkedin, ExternalLink, FileSpreadsheet, RefreshCw
+  Twitter, Linkedin, ExternalLink, FileSpreadsheet, RefreshCw,
+  Lock, LogOut
 } from 'lucide-react'
 import { formatNumber, formatCurrency, formatPercent, getChangeColor, getChangeBg, cn } from '@/lib/utils'
 
@@ -192,15 +193,109 @@ const DEMO_COLORS = ['#16213E', '#2E4057', '#4A6274', '#6B8591', '#8CA7AE']
 const DATA_URL = 'https://raw.githubusercontent.com/pili-code/social-report/main/reports/latest.json'
 const XLSX_URL = 'https://github.com/pili-code/social-report/raw/main/reports/latest.xlsx'
 
+// Password for access
+const ACCESS_PASSWORD = 'TDP2026'
+const AUTH_KEY = 'tdp_dashboard_auth'
+
+// ============================================================================
+// Password Gate Component
+// ============================================================================
+function PasswordGate({ onSuccess }: { onSuccess: () => void }) {
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState(false)
+  const [loading, setLoading] = useState(false)
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    setLoading(true)
+    setError(false)
+
+    // Small delay to feel more secure
+    setTimeout(() => {
+      if (password === ACCESS_PASSWORD) {
+        localStorage.setItem(AUTH_KEY, 'true')
+        onSuccess()
+      } else {
+        setError(true)
+        setPassword('')
+      }
+      setLoading(false)
+    }, 500)
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-dark to-gray-900 px-4">
+      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-dark rounded-full mb-4">
+            <Lock className="w-8 h-8 text-white" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900">TDP Dashboard</h1>
+          <p className="text-gray-500 mt-2">Enter password to access analytics</p>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="mb-4">
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Enter password"
+              className={cn(
+                "w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-dark transition-colors",
+                error ? "border-red-500 bg-red-50" : "border-gray-300"
+              )}
+              autoFocus
+            />
+            {error && (
+              <p className="text-red-500 text-sm mt-2">Incorrect password. Please try again.</p>
+            )}
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading || !password}
+            className={cn(
+              "w-full py-3 rounded-lg font-medium text-white transition-all",
+              loading || !password
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-brand-dark hover:bg-opacity-90"
+            )}
+          >
+            {loading ? (
+              <RefreshCw className="w-5 h-5 animate-spin mx-auto" />
+            ) : (
+              "Access Dashboard"
+            )}
+          </button>
+        </form>
+
+        <p className="text-center text-gray-400 text-sm mt-6">
+          The Design Project
+        </p>
+      </div>
+    </div>
+  )
+}
+
 export default function Dashboard() {
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
   const [data, setData] = useState<ReportData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState('overview')
 
+  // Check authentication on mount
   useEffect(() => {
-    fetchData()
+    const auth = localStorage.getItem(AUTH_KEY)
+    setIsAuthenticated(auth === 'true')
   }, [])
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchData()
+    }
+  }, [isAuthenticated])
 
   async function fetchData() {
     setLoading(true)
@@ -217,6 +312,12 @@ export default function Dashboard() {
     }
   }
 
+  function handleLogout() {
+    localStorage.removeItem(AUTH_KEY)
+    setIsAuthenticated(false)
+    setData(null)
+  }
+
   function handleDownloadXLSX() {
     window.open(XLSX_URL, '_blank')
   }
@@ -224,6 +325,20 @@ export default function Dashboard() {
   function handleOpenGoogleSheets() {
     const sheetsUrl = `https://docs.google.com/spreadsheets/d/create?title=TDP_Social_Report_${data?.period.start}`
     window.open(sheetsUrl, '_blank')
+  }
+
+  // Show nothing while checking auth
+  if (isAuthenticated === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <RefreshCw className="w-8 h-8 animate-spin text-brand-dark" />
+      </div>
+    )
+  }
+
+  // Show password gate if not authenticated
+  if (!isAuthenticated) {
+    return <PasswordGate onSuccess={() => setIsAuthenticated(true)} />
   }
 
   if (loading) {
@@ -288,6 +403,13 @@ export default function Dashboard() {
                 >
                   <FileSpreadsheet className="w-4 h-4" />
                   Google Sheets
+                </button>
+                <button
+                  onClick={handleLogout}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-sm transition-colors"
+                  title="Logout"
+                >
+                  <LogOut className="w-4 h-4" />
                 </button>
               </div>
             </div>
