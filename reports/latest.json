@@ -1,0 +1,421 @@
+{
+  "generated_at": "2026-02-06T16:59:22.227765Z",
+  "period": {
+    "start": "2026-01-29",
+    "end": "2026-02-06",
+    "label": "Week of Jan 29 - Feb 06, 2026"
+  },
+  "previous_period": {
+    "start": "2026-01-20",
+    "end": "2026-01-28"
+  },
+  "cross_platform": {
+    "linkedin": {
+      "impressions": 1457,
+      "members_reached": 882,
+      "reactions": 38,
+      "comments": 4,
+      "saves": 8,
+      "followers_gained": 1,
+      "post_count": 1
+    },
+    "meta_ads": {
+      "reach": 15808,
+      "impressions": 21815,
+      "results": 809,
+      "amount_spent": 37.63,
+      "cost_per_result": 0.0465
+    },
+    "totals": {
+      "total_reach": 15808,
+      "prev_total_reach": 0,
+      "total_followers": 0,
+      "total_reach_change": "+inf%"
+    }
+  },
+  "youtube_detail": {
+    "top_videos": [
+      {
+        "title": "I Built My Entire Design System in 4 Hours With AI. Full Tutorial (Claude + Cursor + Figma)",
+        "views": 9874,
+        "subs": 227,
+        "ctr": 6.76,
+        "revenue": 23.745,
+        "is_short": false,
+        "id": "nafNPuElCtY"
+      },
+      {
+        "title": "Stop using V0 and Lovable to prototype, use Claude Code instead",
+        "views": 2885,
+        "subs": 40,
+        "ctr": 5.47,
+        "revenue": 11.361,
+        "is_short": false,
+        "id": "hqIU6hluMZA"
+      },
+      {
+        "title": "How I Build a Component Library in 2 days (Figma to Claude Code to Storybook)",
+        "views": 2352,
+        "subs": 58,
+        "ctr": 5.3,
+        "revenue": 12.739,
+        "is_short": false,
+        "id": "AiEATeNyWnk"
+      },
+      {
+        "title": "Stop Wasting Dev Time on Frontend: Figma to Code in 8 Minutes",
+        "views": 1247,
+        "subs": 16,
+        "ctr": 11.37,
+        "revenue": 1.761,
+        "is_short": false,
+        "id": "BOl05zmQjOg"
+      },
+      {
+        "title": "Claude Code + Cursor + GitHub: The New AI environment setup",
+        "views": 999,
+        "subs": 20,
+        "ctr": 8.05,
+        "revenue": 4.717,
+        "is_short": false,
+        "id": "nbnD2h4IP8I"
+      },
+      {
+        "title": "Stop using V0 and Lovable to prototype, use Claude Code instead #uxui #figma #claudecode \ud83e\udd1c\ud83c\udffb\ud83e\udd1b\ud83c\udffb",
+        "views": 744,
+        "subs": 0,
+        "ctr": 0.41,
+        "revenue": 0.025,
+        "is_short": true,
+        "id": "fl838phdszc"
+      },
+      {
+        "title": "Stop using V0 and Lovable to prototype, use Claude Code instead #uxui #figma #claudecode \ud83e\udd1c\ud83c\udffb\ud83e\udd1b\ud83c\udffb",
+        "views": 742,
+        "subs": 2,
+        "ctr": 1.81,
+        "revenue": 0.027,
+        "is_short": false,
+        "id": "OvluDQTREcA"
+      },
+      {
+        "title": "Stop using V0 and Lovable to prototype, use Claude Code instead #uxui #figma #claudecode \ud83e\udd1c\ud83c\udffb\ud83e\udd1b\ud83c\udffb",
+        "views": 608,
+        "subs": 1,
+        "ctr": 2.49,
+        "revenue": 0.032,
+        "is_short": false,
+        "id": "OB0FEbNatHs"
+      },
+      {
+        "title": "Stop using V0 and Lovable to prototype, use Claude Code instead #uxui #figma #claudecode \ud83e\udd1c\ud83c\udffb\ud83e\udd1b\ud83c\udffb",
+        "views": 449,
+        "subs": 1,
+        "ctr": 1.05,
+        "revenue": 0.011,
+        "is_short": false,
+        "id": "baCiDQMnB3M"
+      },
+      {
+        "title": "I Tested Gemini 3 Pro vs Claude Opus 4.5 for UI Design (one is clearly superior)",
+        "views": 411,
+        "subs": 8,
+        "ctr": 5.02,
+        "revenue": 0.916,
+        "is_short": false,
+        "id": "9xQIdMAXl2Y"
+      }
+    ],
+    "totals": {
+      "views": 22104,
+      "subscribers": 390,
+      "revenue": 57.3,
+      "impressions": 188207,
+      "avg_ctr": 1.4,
+      "video_count": 111,
+      "shorts_count": 19
+    }
+  },
+  "tiktok_detail": {
+    "daily": [
+      {
+        "date": "2026-01-29",
+        "views": 7,
+        "profile_views": 0,
+        "likes": 0,
+        "comments": 0,
+        "shares": 0
+      },
+      {
+        "date": "2026-01-30",
+        "views": 547,
+        "profile_views": 1,
+        "likes": 16,
+        "comments": 0,
+        "shares": 0
+      },
+      {
+        "date": "2026-01-31",
+        "views": 29,
+        "profile_views": 1,
+        "likes": 2,
+        "comments": 0,
+        "shares": 0
+      },
+      {
+        "date": "2026-02-01",
+        "views": 10,
+        "profile_views": 1,
+        "likes": 0,
+        "comments": 0,
+        "shares": 0
+      },
+      {
+        "date": "2026-02-02",
+        "views": 7,
+        "profile_views": 0,
+        "likes": 0,
+        "comments": 0,
+        "shares": 0
+      },
+      {
+        "date": "2026-02-03",
+        "views": 690,
+        "profile_views": 4,
+        "likes": 10,
+        "comments": 0,
+        "shares": 0
+      },
+      {
+        "date": "2026-02-04",
+        "views": 294,
+        "profile_views": 5,
+        "likes": 13,
+        "comments": 0,
+        "shares": 0
+      }
+    ],
+    "totals": {
+      "views": 1584,
+      "profile_views": 12,
+      "likes": 41,
+      "comments": 0,
+      "shares": 0,
+      "eng_rate": 2.59
+    }
+  },
+  "x_detail": {
+    "daily": [
+      {
+        "date": "2026-01-31",
+        "impressions": 4,
+        "engagements": 0,
+        "likes": 0,
+        "reposts": 0,
+        "profile_visits": 0
+      },
+      {
+        "date": "2026-02-01",
+        "impressions": 5,
+        "engagements": 0,
+        "likes": 0,
+        "reposts": 0,
+        "profile_visits": 0
+      },
+      {
+        "date": "2026-02-02",
+        "impressions": 2,
+        "engagements": 0,
+        "likes": 0,
+        "reposts": 0,
+        "profile_visits": 0
+      },
+      {
+        "date": "2026-02-03",
+        "impressions": 5,
+        "engagements": 0,
+        "likes": 0,
+        "reposts": 0,
+        "profile_visits": 0
+      },
+      {
+        "date": "2026-02-04",
+        "impressions": 70,
+        "engagements": 5,
+        "likes": 2,
+        "reposts": 0,
+        "profile_visits": 2
+      },
+      {
+        "date": "2026-02-05",
+        "impressions": 24,
+        "engagements": 0,
+        "likes": 0,
+        "reposts": 0,
+        "profile_visits": 0
+      },
+      {
+        "date": "2026-02-06",
+        "impressions": 29,
+        "engagements": 2,
+        "likes": 0,
+        "reposts": 0,
+        "profile_visits": 0
+      }
+    ],
+    "totals": {
+      "impressions": 139,
+      "engagements": 7,
+      "likes": 2,
+      "new_follows": 0,
+      "net_follows": 0,
+      "profile_visits": 2,
+      "eng_rate": 5.04
+    }
+  },
+  "meta_detail": {
+    "campaigns": [
+      {
+        "name": "Instagram post: We are hiring a Lead Designer in...",
+        "status": "active",
+        "results": 809,
+        "result_type": "profile_visit_view",
+        "reach": 15808,
+        "impressions": 21815,
+        "cpr": 0.04651422,
+        "spent": 37.63
+      }
+    ],
+    "totals": {
+      "reach": 15808,
+      "impressions": 21815,
+      "results": 809,
+      "spent": 37.63,
+      "avg_cpr": 0.0465
+    }
+  },
+  "linkedin_detail": {
+    "posts": [
+      {
+        "url": "https://www.linkedin.com/feed/update/urn:li:ugcPost:7424892275639406593",
+        "date": "2026-02-04",
+        "impressions": 1457,
+        "reached": 882,
+        "profile_viewers": 15,
+        "followers": 1,
+        "reactions": 38,
+        "comments": 4,
+        "reposts": 0,
+        "saves": 8
+      }
+    ],
+    "demographics": {
+      "industry": [
+        {
+          "name": "Design Services",
+          "pct": 18.8
+        },
+        {
+          "name": "Technology, Information and Internet",
+          "pct": 16.6
+        },
+        {
+          "name": "Software Development",
+          "pct": 13.6
+        },
+        {
+          "name": "IT Services and IT Consulting",
+          "pct": 12.5
+        },
+        {
+          "name": "Graphic Design",
+          "pct": 5.5
+        }
+      ],
+      "seniority": [
+        {
+          "name": "Senior",
+          "pct": 29.6
+        },
+        {
+          "name": "Entry",
+          "pct": 27.9
+        },
+        {
+          "name": "Director",
+          "pct": 8.7
+        },
+        {
+          "name": "Owner",
+          "pct": 8.7
+        },
+        {
+          "name": "CXO",
+          "pct": 7.5
+        }
+      ],
+      "company_size": [
+        {
+          "name": "1-10 employees",
+          "pct": 19.8
+        },
+        {
+          "name": "11-50 employees",
+          "pct": 17.6
+        },
+        {
+          "name": "51-200 employees",
+          "pct": 14.8
+        },
+        {
+          "name": "10,001+ employees",
+          "pct": 9.5
+        },
+        {
+          "name": "1001-5000 employees",
+          "pct": 8.7
+        }
+      ],
+      "location": [
+        {
+          "name": "Greater Buenos Aires",
+          "pct": 13.2
+        },
+        {
+          "name": "New York City Metropolitan Area",
+          "pct": 7.3
+        },
+        {
+          "name": "San Francisco Bay Area",
+          "pct": 4.2
+        },
+        {
+          "name": "London Area, United Kingdom",
+          "pct": 2.8
+        },
+        {
+          "name": "Atlanta Metropolitan Area",
+          "pct": 2.6
+        }
+      ]
+    },
+    "totals": {
+      "impressions": 1457,
+      "reached": 882,
+      "reactions": 38,
+      "comments": 4,
+      "followers": 1,
+      "saves": 8,
+      "post_count": 1
+    }
+  },
+  "customer_wins": [],
+  "historical_trends": {
+    "weeks": [],
+    "youtube_reach": [],
+    "instagram_reach": [],
+    "tiktok_reach": [],
+    "x_reach": [],
+    "total_reach": []
+  }
+}
