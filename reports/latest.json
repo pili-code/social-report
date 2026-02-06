@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-02-06T16:59:22.227765Z",
+  "generated_at": "2026-02-06T18:58:48.106265Z",
   "period": {
     "start": "2026-01-29",
     "end": "2026-02-06",
@@ -45,6 +45,15 @@
         "id": "nafNPuElCtY"
       },
       {
+        "title": "I Built My Entire Design System in 4 Hours With AI. Full Tutorial (Claude + Cursor + Figma)",
+        "views": 9874,
+        "subs": 227,
+        "ctr": 6.76,
+        "revenue": 23.745,
+        "is_short": false,
+        "id": "nafNPuElCtY"
+      },
+      {
         "title": "Stop using V0 and Lovable to prototype, use Claude Code instead",
         "views": 2885,
         "subs": 40,
@@ -52,6 +61,24 @@
         "revenue": 11.361,
         "is_short": false,
         "id": "hqIU6hluMZA"
+      },
+      {
+        "title": "Stop using V0 and Lovable to prototype, use Claude Code instead",
+        "views": 2885,
+        "subs": 40,
+        "ctr": 5.47,
+        "revenue": 11.361,
+        "is_short": false,
+        "id": "hqIU6hluMZA"
+      },
+      {
+        "title": "How I Build a Component Library in 2 days (Figma to Claude Code to Storybook)",
+        "views": 2352,
+        "subs": 58,
+        "ctr": 5.3,
+        "revenue": 12.739,
+        "is_short": false,
+        "id": "AiEATeNyWnk"
       },
       {
         "title": "How I Build a Component Library in 2 days (Figma to Claude Code to Storybook)",
@@ -72,6 +99,15 @@
         "id": "BOl05zmQjOg"
       },
       {
+        "title": "Stop Wasting Dev Time on Frontend: Figma to Code in 8 Minutes",
+        "views": 1247,
+        "subs": 16,
+        "ctr": 11.37,
+        "revenue": 1.761,
+        "is_short": false,
+        "id": "BOl05zmQjOg"
+      },
+      {
         "title": "Claude Code + Cursor + GitHub: The New AI environment setup",
         "views": 999,
         "subs": 20,
@@ -81,59 +117,23 @@
         "id": "nbnD2h4IP8I"
       },
       {
-        "title": "Stop using V0 and Lovable to prototype, use Claude Code instead #uxui #figma #claudecode \ud83e\udd1c\ud83c\udffb\ud83e\udd1b\ud83c\udffb",
-        "views": 744,
-        "subs": 0,
-        "ctr": 0.41,
-        "revenue": 0.025,
-        "is_short": true,
-        "id": "fl838phdszc"
-      },
-      {
-        "title": "Stop using V0 and Lovable to prototype, use Claude Code instead #uxui #figma #claudecode \ud83e\udd1c\ud83c\udffb\ud83e\udd1b\ud83c\udffb",
-        "views": 742,
-        "subs": 2,
-        "ctr": 1.81,
-        "revenue": 0.027,
+        "title": "Claude Code + Cursor + GitHub: The New AI environment setup",
+        "views": 999,
+        "subs": 20,
+        "ctr": 8.05,
+        "revenue": 4.717,
         "is_short": false,
-        "id": "OvluDQTREcA"
-      },
-      {
-        "title": "Stop using V0 and Lovable to prototype, use Claude Code instead #uxui #figma #claudecode \ud83e\udd1c\ud83c\udffb\ud83e\udd1b\ud83c\udffb",
-        "views": 608,
-        "subs": 1,
-        "ctr": 2.49,
-        "revenue": 0.032,
-        "is_short": false,
-        "id": "OB0FEbNatHs"
-      },
-      {
-        "title": "Stop using V0 and Lovable to prototype, use Claude Code instead #uxui #figma #claudecode \ud83e\udd1c\ud83c\udffb\ud83e\udd1b\ud83c\udffb",
-        "views": 449,
-        "subs": 1,
-        "ctr": 1.05,
-        "revenue": 0.011,
-        "is_short": false,
-        "id": "baCiDQMnB3M"
-      },
-      {
-        "title": "I Tested Gemini 3 Pro vs Claude Opus 4.5 for UI Design (one is clearly superior)",
-        "views": 411,
-        "subs": 8,
-        "ctr": 5.02,
-        "revenue": 0.916,
-        "is_short": false,
-        "id": "9xQIdMAXl2Y"
+        "id": "nbnD2h4IP8I"
       }
     ],
     "totals": {
-      "views": 22104,
-      "subscribers": 390,
-      "revenue": 57.3,
-      "impressions": 188207,
+      "views": 44208,
+      "subscribers": 780,
+      "revenue": 114.6,
+      "impressions": 376414,
       "avg_ctr": 1.4,
       "video_count": 111,
-      "shorts_count": 19
+      "shorts_count": 38
     }
   },
   "tiktok_detail": {
