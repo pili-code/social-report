@@ -163,7 +163,7 @@ export function DianneChart({ data }: { data: DiannePost[] }) {
           {
             label: "Saves ★",
             data: data.map((d) => d.saves),
-            type: "line" as const,
+            type: "line",
             borderColor: "#E67E22",
             backgroundColor: "rgba(230,126,34,0.1)",
             borderWidth: 3,
@@ -172,7 +172,7 @@ export function DianneChart({ data }: { data: DiannePost[] }) {
             fill: true,
             tension: 0.3,
             yAxisID: "y1",
-          },
+          } as never,
         ],
       }}
       options={{

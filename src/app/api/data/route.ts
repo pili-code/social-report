@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAllFromTable, getDb } from "@/lib/db";
+import { getAllFromTable } from "@/lib/db";
 import { seedDatabase } from "@/lib/seed";
 
 const TABLES = [
@@ -15,9 +15,8 @@ const TABLES = [
 
 export async function GET() {
   // Seed if empty
-  const db = getDb();
-  const count = db.prepare("SELECT COUNT(*) as c FROM youtube_weekly").get() as { c: number };
-  if (count.c === 0) {
+  const ytWeekly = getAllFromTable("youtube_weekly");
+  if (ytWeekly.length === 0) {
     seedDatabase();
   }
 
