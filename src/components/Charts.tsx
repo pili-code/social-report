@@ -4,7 +4,9 @@ import {
   Chart as ChartJS,
   CategoryScale,
   LinearScale,
+  BarController,
   BarElement,
+  LineController,
   LineElement,
   PointElement,
   Title,
@@ -14,7 +16,7 @@ import {
 } from "chart.js";
 import { Bar, Chart } from "react-chartjs-2";
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend, Filler);
+ChartJS.register(CategoryScale, LinearScale, BarController, BarElement, LineController, LineElement, PointElement, Title, Tooltip, Legend, Filler);
 
 const monthColor: Record<string, string> = {
   Dec: "#1B4F72", Jan: "#154360", Feb: "#1A5276", Mar: "#117A65", Apr: "#2E86AB",
