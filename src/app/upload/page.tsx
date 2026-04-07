@@ -430,8 +430,9 @@ function ChatInterface() {
       } else {
         setMessages(prev => [...prev, { role: "assistant", content: data.response }]);
       }
-    } catch {
-      setMessages(prev => [...prev, { role: "assistant", content: "Failed to connect. Check your API key." }]);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to connect";
+      setMessages(prev => [...prev, { role: "assistant", content: `Error: ${msg}` }]);
     } finally {
       setLoading(false);
     }

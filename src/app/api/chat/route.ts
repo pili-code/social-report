@@ -50,27 +50,33 @@ export async function POST(req: NextRequest) {
 
   const dataContext = `Here is the current GTM dashboard data:\n\n${JSON.stringify(data, null, 2)}`;
 
-  const client = new Anthropic({ apiKey });
+  try {
+    const client = new Anthropic({ apiKey });
 
-  const messages: Anthropic.MessageParam[] = [
-    ...(history || []).map((h: { role: string; content: string }) => ({
-      role: h.role as "user" | "assistant",
-      content: h.content,
-    })),
-    {
-      role: "user",
-      content: `${dataContext}\n\n---\n\nUser question: ${message}`,
-    },
-  ];
+    const messages: Anthropic.MessageParam[] = [
+      ...(history || []).map((h: { role: string; content: string }) => ({
+        role: h.role as "user" | "assistant",
+        content: h.content,
+      })),
+      {
+        role: "user",
+        content: `${dataContext}\n\n---\n\nUser question: ${message}`,
+      },
+    ];
 
-  const response = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 2048,
-    system: SYSTEM_PROMPT,
-    messages,
-  });
+    const response = await client.messages.create({
+      model: "claude-sonnet-4-6",
+      max_tokens: 2048,
+      system: SYSTEM_PROMPT,
+      messages,
+    });
 
-  const text = response.content[0].type === "text" ? response.content[0].text : "";
+    const text = response.content[0].type === "text" ? response.content[0].text : "";
 
-  return NextResponse.json({ response: text });
+    return NextResponse.json({ response: text });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("Chat API error:", message);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
