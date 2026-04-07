@@ -1,22 +1,46 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 
-function getClient(): GoogleGenerativeAI {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey || apiKey === "your-key-here") {
-    throw new Error("GEMINI_API_KEY not configured. Get a free key at https://aistudio.google.com/apikey and add it to .env.local");
+function getApiKey(): string {
+  const key = process.env.OPENROUTER_API_KEY;
+  if (!key || key === "your-key-here") {
+    throw new Error("OPENROUTER_API_KEY not configured");
   }
-  return new GoogleGenerativeAI(apiKey);
+  return key;
+}
+
+const MODEL = "google/gemini-2.0-flash-exp:free";
+
+interface Message {
+  role: "system" | "user" | "assistant";
+  content: string | Array<{ type: string; text?: string; image_url?: { url: string } }>;
+}
+
+async function callOpenRouter(messages: Message[]): Promise<string> {
+  const res = await fetch(OPENROUTER_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${getApiKey()}`,
+      "HTTP-Referer": "https://gtm-app-lovat.vercel.app",
+      "X-Title": "TDP GTM Dashboard",
+    },
+    body: JSON.stringify({ model: MODEL, messages }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`OpenRouter ${res.status}: ${err}`);
+  }
+
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content || "";
 }
 
 export async function generateText(systemPrompt: string, userPrompt: string): Promise<string> {
-  const client = getClient();
-  const model = client.getGenerativeModel({
-    model: "gemini-1.5-flash",
-    systemInstruction: systemPrompt,
-  });
-
-  const result = await model.generateContent(userPrompt);
-  return result.response.text();
+  return callOpenRouter([
+    { role: "system", content: systemPrompt },
+    { role: "user", content: userPrompt },
+  ]);
 }
 
 export async function generateFromImage(
@@ -25,23 +49,16 @@ export async function generateFromImage(
   base64Image: string,
   mimeType: string
 ): Promise<string> {
-  const client = getClient();
-  const model = client.getGenerativeModel({
-    model: "gemini-1.5-flash",
-    systemInstruction: systemPrompt,
-  });
-
-  const result = await model.generateContent([
-    userPrompt,
+  return callOpenRouter([
+    { role: "system", content: systemPrompt },
     {
-      inlineData: {
-        data: base64Image,
-        mimeType,
-      },
+      role: "user",
+      content: [
+        { type: "text", text: userPrompt },
+        { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Image}` } },
+      ],
     },
   ]);
-
-  return result.response.text();
 }
 
 export async function generateChat(
@@ -49,19 +66,13 @@ export async function generateChat(
   history: Array<{ role: string; content: string }>,
   userMessage: string
 ): Promise<string> {
-  const client = getClient();
-  const model = client.getGenerativeModel({
-    model: "gemini-1.5-flash",
-    systemInstruction: systemPrompt,
-  });
-
-  const chat = model.startChat({
-    history: history.map((h) => ({
-      role: h.role === "assistant" ? "model" : "user",
-      parts: [{ text: h.content }],
+  const messages: Message[] = [
+    { role: "system", content: systemPrompt },
+    ...history.map((h) => ({
+      role: (h.role === "assistant" ? "assistant" : "user") as "user" | "assistant",
+      content: h.content,
     })),
-  });
-
-  const result = await chat.sendMessage(userMessage);
-  return result.response.text();
+    { role: "user", content: userMessage },
+  ];
+  return callOpenRouter(messages);
 }
