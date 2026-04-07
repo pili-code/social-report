@@ -1,8 +1,24 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, Component, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { YTWeeklyChart, YTMonthlySparkline, ShortsChart, DianneChart } from "@/components/Charts";
+
+class ChartErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: string }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: "" };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error: error.message };
+  }
+  render() {
+    if (this.state.hasError) {
+      return <div className="p-4 text-sm text-red-600 bg-red-50 rounded-lg">Chart error: {this.state.error}</div>;
+    }
+    return this.props.children;
+  }
+}
 
 interface DataSet {
   youtube_weekly: Array<{ week: string; month: string; views: number; current: number }>;
@@ -291,7 +307,9 @@ function DashboardContent() {
               <span className="w-2 h-2 rounded-full bg-[#0077B5] inline-block" /> Impressions &amp; Saves by Week &mdash; Saves are the key metric
             </div>
             <div className="h-[300px]">
-              <DianneChart data={data.linkedin_dianne_posts} />
+              <ChartErrorBoundary>
+                <DianneChart data={data.linkedin_dianne_posts} />
+              </ChartErrorBoundary>
             </div>
           </div>
 

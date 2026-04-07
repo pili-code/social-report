@@ -67,7 +67,7 @@ export function YTWeeklyChart({ data }: { data: YTWeekly[] }) {
         maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
-          tooltip: { callbacks: { label: (ctx) => `${ctx.raw?.toLocaleString()} views` } },
+          tooltip: { callbacks: { label: (ctx) => `${Number(ctx.raw).toLocaleString()} views` } },
         },
         scales: {
           y: { beginAtZero: true, grid: { color: "#f0f0f0" }, ticks: { font: { family: "JetBrains Mono", size: 11 } } },
@@ -99,7 +99,7 @@ export function YTMonthlySparkline({ data }: { data: YTMonthly[] }) {
         maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
-          tooltip: { callbacks: { label: (ctx) => `Daily avg: ${ctx.raw?.toLocaleString()} views` } },
+          tooltip: { callbacks: { label: (ctx) => `Daily avg: ${Number(ctx.raw).toLocaleString()} views` } },
         },
         scales: {
           y: { beginAtZero: true, grid: { color: "#f0f0f0" }, ticks: { font: { family: "JetBrains Mono", size: 11 } } },
@@ -133,7 +133,7 @@ export function ShortsChart({ data }: { data: ShortsWeekly[] }) {
         maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
-          tooltip: { callbacks: { label: (ctx) => `${ctx.raw?.toLocaleString()} avg views/clip` } },
+          tooltip: { callbacks: { label: (ctx) => `${Number(ctx.raw).toLocaleString()} avg views/clip` } },
         },
         scales: {
           y: { beginAtZero: true, grid: { color: "#f0f0f0" }, ticks: { font: { family: "JetBrains Mono", size: 11 } } },
@@ -183,7 +183,7 @@ export function DianneChart({ data }: { data: DiannePost[] }) {
         interaction: { mode: "index", intersect: false },
         plugins: {
           legend: { position: "top", labels: { font: { family: "Inter", size: 11 }, usePointStyle: true, pointStyle: "circle" } },
-          tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.raw?.toLocaleString()}` } },
+          tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${Number(ctx.raw).toLocaleString()}` } },
         },
         scales: {
           y: {
