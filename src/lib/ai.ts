@@ -8,7 +8,7 @@ function getApiKey(): string {
   return key;
 }
 
-const MODEL = "google/gemini-2.0-flash-exp:free";
+const MODEL = "google/gemma-3-27b-it:free";
 
 interface Message {
   role: "system" | "user" | "assistant";
