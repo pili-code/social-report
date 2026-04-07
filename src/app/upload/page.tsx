@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useRef, useEffect } from "react";
 import { useDropzone } from "react-dropzone";
 
 interface MissingField {
@@ -360,6 +360,9 @@ export default function UploadPage() {
         </div>
       )}
 
+      {/* Chat Interface */}
+      <ChatInterface />
+
       {/* Saved confirmation */}
       {saved && (
         <div className="bg-[#D5F5E3] border border-[#1E8449]/20 rounded-xl p-6 mb-6">
@@ -384,4 +387,164 @@ export default function UploadPage() {
       )}
     </div>
   );
+}
+
+// ===== Chat Interface =====
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+function ChatInterface() {
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const handleSend = async () => {
+    const text = input.trim();
+    if (!text || loading) return;
+
+    const userMsg: ChatMessage = { role: "user", content: text };
+    setMessages(prev => [...prev, userMsg]);
+    setInput("");
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: text,
+          history: messages.slice(-10), // last 10 messages for context
+        }),
+      });
+      const data = await res.json();
+
+      if (data.error) {
+        setMessages(prev => [...prev, { role: "assistant", content: `Error: ${data.error}` }]);
+      } else {
+        setMessages(prev => [...prev, { role: "assistant", content: data.response }]);
+      }
+    } catch {
+      setMessages(prev => [...prev, { role: "assistant", content: "Failed to connect. Check your API key." }]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mt-6">
+      {/* Header */}
+      <div className="px-5 py-3.5 border-b border-gray-200 flex items-center gap-2.5">
+        <div className="w-2 h-2 rounded-full bg-[#5955ff]" />
+        <span className="text-[13px] font-semibold">Ask Claude about your data</span>
+        <span className="text-[11px] text-gray-400">Analyzes all dashboard data in real-time</span>
+      </div>
+
+      {/* Messages */}
+      <div className="h-[400px] overflow-y-auto px-5 py-4 space-y-4 bg-gray-50/50">
+        {messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full text-center">
+            <div className="text-gray-300 mb-3">
+              <svg className="w-10 h-10 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+            </div>
+            <p className="text-sm text-gray-400 mb-1">Ask anything about your GTM performance</p>
+            <div className="flex flex-wrap justify-center gap-2 mt-3">
+              {[
+                "What was our best performing week?",
+                "Compare YouTube Mar vs Feb",
+                "Which cold email campaign should we double down on?",
+                "Why did LinkedIn drop in February?",
+              ].map((q, i) => (
+                <button
+                  key={i}
+                  onClick={() => { setInput(q); }}
+                  className="text-[11px] px-3 py-1.5 rounded-full border border-gray-200 text-gray-500 hover:border-[#5955ff] hover:text-[#5955ff] transition-colors"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {messages.map((msg, i) => (
+          <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+            <div
+              className={`max-w-[85%] rounded-xl px-4 py-3 text-sm leading-relaxed ${
+                msg.role === "user"
+                  ? "bg-[#5955ff] text-white rounded-br-sm"
+                  : "bg-white border border-gray-200 text-gray-700 rounded-bl-sm"
+              }`}
+            >
+              {msg.role === "assistant" ? (
+                <div
+                  className="prose prose-sm max-w-none [&_p]:my-1.5 [&_ul]:my-1.5 [&_li]:my-0.5 [&_strong]:text-gray-900 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1"
+                  dangerouslySetInnerHTML={{ __html: formatMarkdown(msg.content) }}
+                />
+              ) : (
+                msg.content
+              )}
+            </div>
+          </div>
+        ))}
+
+        {loading && (
+          <div className="flex justify-start">
+            <div className="bg-white border border-gray-200 rounded-xl rounded-bl-sm px-4 py-3">
+              <div className="flex gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: "0ms" }} />
+                <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: "150ms" }} />
+                <div className="w-2 h-2 rounded-full bg-gray-300 animate-bounce" style={{ animationDelay: "300ms" }} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input */}
+      <div className="px-4 py-3 border-t border-gray-200 flex gap-2">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
+          placeholder="Ask about your GTM performance..."
+          className="flex-1 px-4 py-2.5 text-sm border border-gray-200 rounded-lg outline-none focus:border-[#5955ff] transition-colors"
+          disabled={loading}
+        />
+        <button
+          onClick={handleSend}
+          disabled={loading || !input.trim()}
+          className="bg-[#5955ff] text-white px-4 py-2.5 rounded-lg font-semibold text-sm hover:bg-[#4745cc] transition-colors disabled:opacity-40"
+        >
+          Send
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function formatMarkdown(text: string): string {
+  return text
+    .replace(/### (.*)/g, "<h3>$1</h3>")
+    .replace(/## (.*)/g, "<h3>$1</h3>")
+    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.*?)\*/g, "<em>$1</em>")
+    .replace(/`(.*?)`/g, '<code class="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono">$1</code>')
+    .replace(/^- (.*)/gm, "<li>$1</li>")
+    .replace(/(<li>[\s\S]*<\/li>)/, "<ul>$1</ul>")
+    .replace(/\n\n/g, "</p><p>")
+    .replace(/\n/g, "<br>")
+    .replace(/^/, "<p>")
+    .replace(/$/, "</p>");
 }
