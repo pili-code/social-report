@@ -11,7 +11,7 @@ function getClient(): GoogleGenerativeAI {
 export async function generateText(systemPrompt: string, userPrompt: string): Promise<string> {
   const client = getClient();
   const model = client.getGenerativeModel({
-    model: "gemini-2.0-flash",
+    model: "gemini-1.5-flash",
     systemInstruction: systemPrompt,
   });
 
@@ -27,7 +27,7 @@ export async function generateFromImage(
 ): Promise<string> {
   const client = getClient();
   const model = client.getGenerativeModel({
-    model: "gemini-2.0-flash",
+    model: "gemini-1.5-flash",
     systemInstruction: systemPrompt,
   });
 
@@ -51,7 +51,7 @@ export async function generateChat(
 ): Promise<string> {
   const client = getClient();
   const model = client.getGenerativeModel({
-    model: "gemini-2.0-flash",
+    model: "gemini-1.5-flash",
     systemInstruction: systemPrompt,
   });
 
