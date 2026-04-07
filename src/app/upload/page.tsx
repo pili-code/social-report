@@ -536,25 +536,32 @@ function ChatInterface() {
 }
 
 function formatMarkdown(text: string): string {
-  // Split into lines to handle tables
   const lines = text.split("\n");
   const result: string[] = [];
   let inTable = false;
   let tableRows: string[][] = [];
 
+  function inline(s: string): string {
+    return s
+      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*(.*?)\*/g, "<em>$1</em>")
+      .replace(/`(.*?)`/g, '<code class="bg-gray-100 px-1 py-0.5 rounded text-[11px] font-mono">$1</code>')
+      .replace(/→/g, "&rarr;")
+      .replace(/↑/g, "&#9650;")
+      .replace(/↓/g, "&#9660;");
+  }
+
   function flushTable() {
     if (tableRows.length === 0) return;
     let html = '<div class="overflow-x-auto my-3"><table class="w-full text-xs border-collapse"><thead><tr>';
-    const headers = tableRows[0];
-    for (const h of headers) {
-      html += `<th class="text-left px-3 py-2 bg-gray-100 border border-gray-200 font-semibold text-gray-700 whitespace-nowrap">${h.trim()}</th>`;
+    for (const h of tableRows[0]) {
+      html += `<th class="text-left px-3 py-2 bg-gray-100 border border-gray-200 font-semibold text-gray-700 whitespace-nowrap">${inline(h.trim())}</th>`;
     }
     html += "</tr></thead><tbody>";
-    // Skip separator row (index 1), render data rows
     for (let i = 2; i < tableRows.length; i++) {
-      html += "<tr>";
-      for (let j = 0; j < tableRows[i].length; j++) {
-        html += `<td class="px-3 py-2 border border-gray-200 text-gray-600">${tableRows[i][j].trim()}</td>`;
+      html += '<tr class="hover:bg-gray-50">';
+      for (const cell of tableRows[i]) {
+        html += `<td class="px-3 py-2 border border-gray-200 text-gray-600">${inline(cell.trim())}</td>`;
       }
       html += "</tr>";
     }
@@ -566,12 +573,10 @@ function formatMarkdown(text: string): string {
   for (const line of lines) {
     const trimmed = line.trim();
 
-    // Detect table rows (starts and ends with |)
+    // Table rows
     if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
       const cells = trimmed.slice(1, -1).split("|");
-      // Check if it's a separator row (|---|---|)
       const isSeparator = cells.every(c => /^[\s\-:]+$/.test(c));
-
       if (!inTable && !isSeparator) {
         inTable = true;
         tableRows = [cells];
@@ -581,34 +586,29 @@ function formatMarkdown(text: string): string {
       continue;
     }
 
-    // Not a table line — flush any pending table
-    if (inTable) {
-      inTable = false;
-      flushTable();
-    }
+    if (inTable) { inTable = false; flushTable(); }
 
-    // Regular markdown
     if (trimmed === "") {
-      result.push("<br>");
+      result.push("");
+    } else if (trimmed.startsWith("#### ")) {
+      result.push(`<h5 class="font-semibold text-[13px] mt-3 mb-1 text-gray-800">${inline(trimmed.slice(5))}</h5>`);
     } else if (trimmed.startsWith("### ")) {
-      result.push(`<h4 class="font-semibold text-sm mt-3 mb-1">${trimmed.slice(4)}</h4>`);
+      result.push(`<h4 class="font-semibold text-sm mt-3 mb-1 text-gray-800">${inline(trimmed.slice(4))}</h4>`);
     } else if (trimmed.startsWith("## ")) {
-      result.push(`<h3 class="font-semibold text-sm mt-3 mb-1">${trimmed.slice(3)}</h3>`);
-    } else if (trimmed.startsWith("- ")) {
-      result.push(`<li class="ml-4 list-disc text-sm">${trimmed.slice(2)}</li>`);
-    } else if (/^\d+\. /.test(trimmed)) {
-      result.push(`<li class="ml-4 list-decimal text-sm">${trimmed.replace(/^\d+\. /, "")}</li>`);
+      result.push(`<h3 class="font-bold text-[15px] mt-4 mb-1.5 text-gray-900">${inline(trimmed.slice(3))}</h3>`);
+    } else if (trimmed.startsWith("# ")) {
+      result.push(`<h2 class="font-bold text-base mt-4 mb-2 text-gray-900">${inline(trimmed.slice(2))}</h2>`);
+    } else if (trimmed.startsWith("- ") || trimmed.startsWith("* ")) {
+      result.push(`<div class="flex gap-2 ml-2 my-0.5 text-sm"><span class="text-gray-400 shrink-0">&#8226;</span><span>${inline(trimmed.slice(2))}</span></div>`);
+    } else if (/^\d+\.\s/.test(trimmed)) {
+      const num = trimmed.match(/^(\d+)\.\s/)?.[1] || "1";
+      const content = trimmed.replace(/^\d+\.\s/, "");
+      result.push(`<div class="flex gap-2 ml-2 my-0.5 text-sm"><span class="text-gray-400 shrink-0 font-mono text-xs">${num}.</span><span>${inline(content)}</span></div>`);
     } else {
-      let formatted = trimmed
-        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-        .replace(/\*(.*?)\*/g, "<em>$1</em>")
-        .replace(/`(.*?)`/g, '<code class="bg-gray-100 px-1 py-0.5 rounded text-[11px] font-mono">$1</code>');
-      result.push(`<p class="text-sm my-1">${formatted}</p>`);
+      result.push(`<p class="text-sm my-1">${inline(trimmed)}</p>`);
     }
   }
 
-  // Flush any remaining table
   if (inTable) flushTable();
-
-  return result.join("");
+  return result.join("\n");
 }
