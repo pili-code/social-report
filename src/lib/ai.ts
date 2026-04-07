@@ -8,7 +8,13 @@ function getApiKey(): string {
   return key;
 }
 
-const MODEL = "google/gemma-3-27b-it:free";
+// Fallback chain — if one model is rate-limited, try the next
+const MODELS = [
+  "nvidia/nemotron-3-super-120b-a12b:free",
+  "nvidia/nemotron-nano-9b-v2:free",
+  "minimax/minimax-m2.5:free",
+  "google/gemma-3-27b-it:free",
+];
 
 interface Message {
   role: "system" | "user" | "assistant";
@@ -16,24 +22,37 @@ interface Message {
 }
 
 async function callOpenRouter(messages: Message[]): Promise<string> {
-  const res = await fetch(OPENROUTER_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${getApiKey()}`,
-      "HTTP-Referer": "https://gtm-app-lovat.vercel.app",
-      "X-Title": "TDP GTM Dashboard",
-    },
-    body: JSON.stringify({ model: MODEL, messages }),
-  });
+  const apiKey = getApiKey();
+  let lastError = "";
 
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`OpenRouter ${res.status}: ${err}`);
+  for (const model of MODELS) {
+    try {
+      const res = await fetch(OPENROUTER_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+          "HTTP-Referer": "https://gtm-app-lovat.vercel.app",
+          "X-Title": "TDP GTM Dashboard",
+        },
+        body: JSON.stringify({ model, messages }),
+      });
+
+      const data = await res.json();
+
+      if (data.error) {
+        lastError = `${model}: ${data.error.message || JSON.stringify(data.error)}`;
+        continue; // try next model
+      }
+
+      return data.choices?.[0]?.message?.content || "";
+    } catch (err) {
+      lastError = `${model}: ${err instanceof Error ? err.message : "unknown error"}`;
+      continue;
+    }
   }
 
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content || "";
+  throw new Error(`All models failed. Last error: ${lastError}`);
 }
 
 export async function generateText(systemPrompt: string, userPrompt: string): Promise<string> {
