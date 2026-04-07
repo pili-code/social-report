@@ -12,7 +12,7 @@ import {
   Legend,
   Filler,
 } from "chart.js";
-import { Bar, Line } from "react-chartjs-2";
+import { Bar, Chart } from "react-chartjs-2";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend, Filler);
 
@@ -146,11 +146,13 @@ export function ShortsChart({ data }: { data: ShortsWeekly[] }) {
 
 export function DianneChart({ data }: { data: DiannePost[] }) {
   return (
-    <Bar
+    <Chart
+      type="bar"
       data={{
         labels: data.map((d) => d.week),
         datasets: [
           {
+            type: "bar" as const,
             label: "Impressions",
             data: data.map((d) => d.impressions),
             backgroundColor: "rgba(0,119,181,0.12)",
@@ -161,9 +163,9 @@ export function DianneChart({ data }: { data: DiannePost[] }) {
             yAxisID: "y",
           },
           {
+            type: "line" as const,
             label: "Saves ★",
             data: data.map((d) => d.saves),
-            type: "line",
             borderColor: "#E67E22",
             backgroundColor: "rgba(230,126,34,0.1)",
             borderWidth: 3,
@@ -172,7 +174,7 @@ export function DianneChart({ data }: { data: DiannePost[] }) {
             fill: true,
             tension: 0.3,
             yAxisID: "y1",
-          } as never,
+          },
         ],
       }}
       options={{
