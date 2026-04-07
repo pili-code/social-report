@@ -536,16 +536,79 @@ function ChatInterface() {
 }
 
 function formatMarkdown(text: string): string {
-  return text
-    .replace(/### (.*)/g, "<h3>$1</h3>")
-    .replace(/## (.*)/g, "<h3>$1</h3>")
-    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
-    .replace(/\*(.*?)\*/g, "<em>$1</em>")
-    .replace(/`(.*?)`/g, '<code class="bg-gray-100 px-1 py-0.5 rounded text-xs font-mono">$1</code>')
-    .replace(/^- (.*)/gm, "<li>$1</li>")
-    .replace(/(<li>[\s\S]*<\/li>)/, "<ul>$1</ul>")
-    .replace(/\n\n/g, "</p><p>")
-    .replace(/\n/g, "<br>")
-    .replace(/^/, "<p>")
-    .replace(/$/, "</p>");
+  // Split into lines to handle tables
+  const lines = text.split("\n");
+  const result: string[] = [];
+  let inTable = false;
+  let tableRows: string[][] = [];
+
+  function flushTable() {
+    if (tableRows.length === 0) return;
+    let html = '<div class="overflow-x-auto my-3"><table class="w-full text-xs border-collapse"><thead><tr>';
+    const headers = tableRows[0];
+    for (const h of headers) {
+      html += `<th class="text-left px-3 py-2 bg-gray-100 border border-gray-200 font-semibold text-gray-700 whitespace-nowrap">${h.trim()}</th>`;
+    }
+    html += "</tr></thead><tbody>";
+    // Skip separator row (index 1), render data rows
+    for (let i = 2; i < tableRows.length; i++) {
+      html += "<tr>";
+      for (let j = 0; j < tableRows[i].length; j++) {
+        html += `<td class="px-3 py-2 border border-gray-200 text-gray-600">${tableRows[i][j].trim()}</td>`;
+      }
+      html += "</tr>";
+    }
+    html += "</tbody></table></div>";
+    result.push(html);
+    tableRows = [];
+  }
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+
+    // Detect table rows (starts and ends with |)
+    if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
+      const cells = trimmed.slice(1, -1).split("|");
+      // Check if it's a separator row (|---|---|)
+      const isSeparator = cells.every(c => /^[\s\-:]+$/.test(c));
+
+      if (!inTable && !isSeparator) {
+        inTable = true;
+        tableRows = [cells];
+      } else if (inTable) {
+        tableRows.push(cells);
+      }
+      continue;
+    }
+
+    // Not a table line — flush any pending table
+    if (inTable) {
+      inTable = false;
+      flushTable();
+    }
+
+    // Regular markdown
+    if (trimmed === "") {
+      result.push("<br>");
+    } else if (trimmed.startsWith("### ")) {
+      result.push(`<h4 class="font-semibold text-sm mt-3 mb-1">${trimmed.slice(4)}</h4>`);
+    } else if (trimmed.startsWith("## ")) {
+      result.push(`<h3 class="font-semibold text-sm mt-3 mb-1">${trimmed.slice(3)}</h3>`);
+    } else if (trimmed.startsWith("- ")) {
+      result.push(`<li class="ml-4 list-disc text-sm">${trimmed.slice(2)}</li>`);
+    } else if (/^\d+\. /.test(trimmed)) {
+      result.push(`<li class="ml-4 list-decimal text-sm">${trimmed.replace(/^\d+\. /, "")}</li>`);
+    } else {
+      let formatted = trimmed
+        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+        .replace(/\*(.*?)\*/g, "<em>$1</em>")
+        .replace(/`(.*?)`/g, '<code class="bg-gray-100 px-1 py-0.5 rounded text-[11px] font-mono">$1</code>');
+      result.push(`<p class="text-sm my-1">${formatted}</p>`);
+    }
+  }
+
+  // Flush any remaining table
+  if (inTable) flushTable();
+
+  return result.join("");
 }
