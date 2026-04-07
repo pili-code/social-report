@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import Anthropic from "@anthropic-ai/sdk";
+import { generateChat } from "@/lib/ai";
 import { getAllFromTable } from "@/lib/db";
 import { seedDatabase } from "@/lib/seed";
 
@@ -32,51 +32,27 @@ When answering:
 - Use markdown formatting for readability`;
 
 export async function POST(req: NextRequest) {
-  const { message, history } = await req.json();
-
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey || apiKey === "your-key-here") {
-    return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 500 });
-  }
-
-  // Load all data
-  const ytWeekly = getAllFromTable("youtube_weekly");
-  if ((ytWeekly as unknown[]).length === 0) seedDatabase();
-
-  const data: Record<string, unknown[]> = {};
-  for (const table of TABLES) {
-    data[table] = getAllFromTable(table);
-  }
-
-  const dataContext = `Here is the current GTM dashboard data:\n\n${JSON.stringify(data, null, 2)}`;
-
   try {
-    const client = new Anthropic({ apiKey });
+    const { message, history } = await req.json();
 
-    const messages: Anthropic.MessageParam[] = [
-      ...(history || []).map((h: { role: string; content: string }) => ({
-        role: h.role as "user" | "assistant",
-        content: h.content,
-      })),
-      {
-        role: "user",
-        content: `${dataContext}\n\n---\n\nUser question: ${message}`,
-      },
-    ];
+    // Load all data
+    const ytWeekly = getAllFromTable("youtube_weekly");
+    if ((ytWeekly as unknown[]).length === 0) seedDatabase();
 
-    const response = await client.messages.create({
-      model: "claude-sonnet-4-6",
-      max_tokens: 2048,
-      system: SYSTEM_PROMPT,
-      messages,
-    });
+    const data: Record<string, unknown[]> = {};
+    for (const table of TABLES) {
+      data[table] = getAllFromTable(table);
+    }
 
-    const text = response.content[0].type === "text" ? response.content[0].text : "";
+    const dataContext = `Here is the current GTM dashboard data:\n\n${JSON.stringify(data, null, 2)}`;
+    const fullMessage = `${dataContext}\n\n---\n\nUser question: ${message}`;
 
-    return NextResponse.json({ response: text });
+    const response = await generateChat(SYSTEM_PROMPT, history || [], fullMessage);
+
+    return NextResponse.json({ response });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unknown error";
-    console.error("Chat API error:", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    console.error("Chat API error:", msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

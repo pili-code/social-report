@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { parseImageWithClaude } from "@/lib/parse-image";
+import { analyzeImage } from "@/lib/analyze";
 import { bulkUpsert } from "@/lib/db";
 
 const UNIQUE_KEYS: Record<string, string[]> = {
@@ -23,24 +23,21 @@ export async function POST(req: NextRequest) {
   }
 
   const ext = file.name.split(".").pop()?.toLowerCase();
-  const mediaTypes: Record<string, "image/jpeg" | "image/png" | "image/gif" | "image/webp"> = {
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    png: "image/png",
-    gif: "image/gif",
-    webp: "image/webp",
+  const mimeTypes: Record<string, string> = {
+    jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png",
+    gif: "image/gif", webp: "image/webp",
   };
 
-  const mediaType = mediaTypes[ext || ""] || "image/png";
+  const mimeType = mimeTypes[ext || ""] || "image/png";
   const buffer = Buffer.from(await file.arrayBuffer());
   const base64 = buffer.toString("base64");
 
   try {
-    const datasets = await parseImageWithClaude(base64, mediaType);
+    const result = await analyzeImage(base64, mimeType);
 
     if (action === "save") {
       const results = [];
-      for (const ds of datasets) {
+      for (const ds of result.datasets) {
         const ukeys = UNIQUE_KEYS[ds.table];
         if (!ukeys) continue;
         const res = bulkUpsert(ds.table, ds.rows, ukeys);
@@ -49,7 +46,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ saved: true, results });
     }
 
-    return NextResponse.json({ preview: true, datasets });
+    return NextResponse.json({ preview: true, datasets: result.datasets });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Failed to parse image";
     return NextResponse.json({ error: message }, { status: 500 });

@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { generateText, generateFromImage } from "./ai";
 
 const SYSTEM_PROMPT = `You are a data extraction and analysis assistant for a GTM (Go-To-Market) performance dashboard used by The Design Project (TDP), a B2B design team.
 
@@ -9,7 +9,7 @@ Your job is to:
 4. Flag missing fields and suggest values where possible
 5. Add an "analysis" summary explaining what the data shows
 
-You must return ONLY valid JSON — no markdown, no explanation, no wrapping.
+You must return ONLY valid JSON — no markdown, no explanation, no wrapping in code blocks.
 
 The JSON must have this structure:
 {
@@ -66,64 +66,23 @@ export interface AnalysisResult {
   overall_analysis: string;
 }
 
-function getClient(): Anthropic {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey || apiKey === "your-key-here") {
-    throw new Error("ANTHROPIC_API_KEY not configured. Add your key to .env.local");
-  }
-  return new Anthropic({ apiKey });
-}
+const USER_PROMPT = "Analyze this data. Extract all GTM data, identify missing fields, suggest completions, and provide analysis. Return ONLY the JSON, no markdown wrapping.";
 
 export async function analyzeImage(
   base64Image: string,
-  mediaType: "image/jpeg" | "image/png" | "image/gif" | "image/webp"
+  mediaType: string
 ): Promise<AnalysisResult> {
-  const client = getClient();
-
-  const response = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 4096,
-    system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: "user",
-        content: [
-          {
-            type: "image",
-            source: { type: "base64", media_type: mediaType, data: base64Image },
-          },
-          {
-            type: "text",
-            text: "Analyze this screenshot. Extract all GTM data, identify missing fields, suggest completions, and provide analysis. Return ONLY the JSON.",
-          },
-        ],
-      },
-    ],
-  });
-
-  return parseResponse(response);
+  const text = await generateFromImage(SYSTEM_PROMPT, USER_PROMPT, base64Image, mediaType);
+  return parseResponse(text);
 }
 
 export async function analyzeText(rawText: string, filename: string): Promise<AnalysisResult> {
-  const client = getClient();
-
-  const response = await client.messages.create({
-    model: "claude-sonnet-4-6",
-    max_tokens: 4096,
-    system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: "user",
-        content: `Analyze this data from file "${filename}". Extract all GTM data, identify missing fields, suggest completions, and provide analysis. Return ONLY the JSON.\n\n---\n${rawText}`,
-      },
-    ],
-  });
-
-  return parseResponse(response);
+  const prompt = `${USER_PROMPT}\n\nFile: "${filename}"\n\n---\n${rawText}`;
+  const text = await generateText(SYSTEM_PROMPT, prompt);
+  return parseResponse(text);
 }
 
-function parseResponse(response: Anthropic.Message): AnalysisResult {
-  const text = response.content[0].type === "text" ? response.content[0].text : "";
+function parseResponse(text: string): AnalysisResult {
   let jsonStr = text.trim();
   if (jsonStr.startsWith("```")) {
     jsonStr = jsonStr.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
