@@ -871,6 +871,10 @@ function DashboardContent() {
           const xImp = xSlice.reduce((s, w) => s + w.impressions, 0);
           const xEng = xSlice.reduce((s, w) => s + w.engagements, 0);
           const xNetFollows = xSlice.reduce((s, w) => s + w.follows - w.unfollows, 0);
+          // Combined YouTube: long-form + shorts, per day
+          const ytTotalViews = (yt?.views ?? 0) + shortsViews;
+          const ytDays = yt?.days ?? 0;
+          const ytCombinedDaily = ytDays > 0 ? Math.round(ytTotalViews / ytDays) : null;
           return {
             month, yt, dianne,
             isPartial: yt?.partial === 1,
@@ -878,6 +882,8 @@ function DashboardContent() {
             hasTDP: tdpSlice.length > 0,
             hasX: xSlice.length > 0,
             metrics: {
+              yt_combined_daily: ytCombinedDaily,
+              yt_combined_total: ytTotalViews > 0 ? ytTotalViews : null,
               yt_daily_avg: yt?.daily_avg ?? null,
               yt_views: yt?.views ?? null,
               shorts_avg_per_clip: shortsClips > 0 ? Math.round(shortsViews / shortsClips) : null,
@@ -904,14 +910,21 @@ function DashboardContent() {
         type ChannelGroup = { channel: string; color: string; metrics: MetricDef[] };
         const groups: ChannelGroup[] = [
           {
-            channel: "YouTube Long-form", color: "#C0392B",
+            channel: "YouTube (long-form + shorts)", color: "#922B21",
+            metrics: [
+              { label: "Daily Avg Views (combined)", key: "yt_combined_daily", unit: "/day", kind: "ratio" },
+              { label: "Total Monthly Views (combined)", key: "yt_combined_total", unit: "views", kind: "count" },
+            ],
+          },
+          {
+            channel: "↳ YouTube Long-form", color: "#C0392B",
             metrics: [
               { label: "Daily Avg Views", key: "yt_daily_avg", unit: "/day", kind: "ratio" },
               { label: "Raw Monthly Views", key: "yt_views", unit: "views", kind: "count" },
             ],
           },
           {
-            channel: "YouTube Shorts", color: "#E67E22",
+            channel: "↳ YouTube Shorts", color: "#E67E22",
             metrics: [
               { label: "Avg Views/Clip", key: "shorts_avg_per_clip", unit: "/clip", kind: "ratio" },
               { label: "Total Views", key: "shorts_total_views", unit: "views", kind: "count" },
