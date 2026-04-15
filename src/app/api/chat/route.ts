@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateChat } from "@/lib/ai";
 import { getAllFromTable } from "@/lib/db";
-import { seedDatabase } from "@/lib/seed";
 
 const TABLES = [
   "youtube_weekly", "youtube_monthly", "youtube_videos", "shorts_weekly",
@@ -35,14 +34,12 @@ export async function POST(req: NextRequest) {
   try {
     const { message, history } = await req.json();
 
-    // Load all data
-    const ytWeekly = getAllFromTable("youtube_weekly");
-    if ((ytWeekly as unknown[]).length === 0) seedDatabase();
-
     const data: Record<string, unknown[]> = {};
-    for (const table of TABLES) {
-      data[table] = getAllFromTable(table);
-    }
+    await Promise.all(
+      TABLES.map(async (table) => {
+        data[table] = await getAllFromTable(table);
+      })
+    );
 
     const dataContext = `Here is the current GTM dashboard data:\n\n${JSON.stringify(data, null, 2)}`;
     const fullMessage = `${dataContext}\n\n---\n\nUser question: ${message}`;

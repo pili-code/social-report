@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { getAllFromTable } from "@/lib/db";
-import { seedDatabase } from "@/lib/seed";
 
 const TABLES = [
   "youtube_weekly",
@@ -11,19 +10,15 @@ const TABLES = [
   "linkedin_dianne_monthly",
   "linkedin_tdp_weekly",
   "cold_email_campaigns",
+  "twitter_weekly",
 ];
 
 export async function GET() {
-  // Seed if empty
-  const ytWeekly = getAllFromTable("youtube_weekly");
-  if (ytWeekly.length === 0) {
-    seedDatabase();
-  }
-
   const data: Record<string, unknown[]> = {};
-  for (const table of TABLES) {
-    data[table] = getAllFromTable(table);
-  }
-
+  await Promise.all(
+    TABLES.map(async (table) => {
+      data[table] = await getAllFromTable(table);
+    })
+  );
   return NextResponse.json(data);
 }

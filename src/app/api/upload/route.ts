@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     for (const p of parsed) {
       const ukeys = UNIQUE_KEYS[p.table];
       if (!ukeys) continue;
-      const res = bulkUpsert(p.table, p.rows, ukeys);
+      const res = await bulkUpsert(p.table, p.rows, ukeys);
       results.push({ table: p.table, channel: p.channel, ...res });
     }
     return NextResponse.json({ saved: true, results });

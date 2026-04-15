@@ -2,7 +2,33 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useEffect, useState } from "react";
+
+function LastUpdated() {
+  const [date, setDate] = useState<string>("");
+  useEffect(() => {
+    fetch("/api/data")
+      .then((r) => r.json())
+      .then((data) => {
+        const allDates: Date[] = [];
+        for (const key of Object.keys(data)) {
+          const rows = data[key];
+          if (!Array.isArray(rows)) continue;
+          for (const row of rows) {
+            if (row?.created_at) {
+              const d = new Date(row.created_at);
+              if (!isNaN(d.getTime())) allDates.push(d);
+            }
+          }
+        }
+        if (allDates.length === 0) return;
+        const max = new Date(Math.max(...allDates.map((d) => d.getTime())));
+        setDate(max.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }));
+      })
+      .catch(() => setDate(new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })));
+  }, []);
+  return <div>Last updated: {date || "…"}</div>;
+}
 
 const NAV_ITEMS = [
   { key: "overview", label: "Overview", color: "#2E86AB" },
@@ -10,6 +36,7 @@ const NAV_ITEMS = [
   { key: "shorts", label: "Shorts", color: "#E67E22" },
   { key: "linkedin-dianne", label: "LinkedIn: Dianne", color: "#0077B5" },
   { key: "linkedin-tdp", label: "LinkedIn: TDP Page", color: "#1A5276" },
+  { key: "twitter", label: "X (Twitter)", color: "#111111" },
   { key: "cold-email", label: "Cold Email", color: "#6C3483" },
   { key: "monthly-growth", label: "Monthly Growth", color: "#117A65" },
 ];
@@ -78,7 +105,7 @@ export default function Sidebar() {
         <span className="inline-block bg-[#117A65] text-white px-2 py-0.5 rounded text-[10px] font-semibold mb-1">
           LIVE
         </span>
-        <div>Last updated: Apr 6, 2026</div>
+        <LastUpdated />
       </div>
     </aside>
   );

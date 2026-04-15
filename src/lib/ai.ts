@@ -1,65 +1,70 @@
-const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const MODEL = "gemini-2.5-flash";
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 
 function getApiKey(): string {
-  const key = process.env.OPENROUTER_API_KEY;
-  if (!key || key === "your-key-here") {
-    throw new Error("OPENROUTER_API_KEY not configured");
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) {
+    throw new Error("GEMINI_API_KEY not configured");
   }
   return key;
 }
 
-// Fallback chain — if one model is rate-limited, try the next
-const MODELS = [
-  "nvidia/nemotron-3-super-120b-a12b:free",
-  "nvidia/nemotron-nano-9b-v2:free",
-  "minimax/minimax-m2.5:free",
-  "google/gemma-3-27b-it:free",
-];
+type TextPart = { text: string };
+type ImagePart = { inline_data: { mime_type: string; data: string } };
+type Part = TextPart | ImagePart;
 
-interface Message {
-  role: "system" | "user" | "assistant";
-  content: string | Array<{ type: string; text?: string; image_url?: { url: string } }>;
+interface Content {
+  role: "user" | "model";
+  parts: Part[];
 }
 
-async function callOpenRouter(messages: Message[]): Promise<string> {
+async function callGemini(
+  systemInstruction: string,
+  contents: Content[],
+  jsonMode: boolean
+): Promise<string> {
   const apiKey = getApiKey();
-  let lastError = "";
 
-  for (const model of MODELS) {
-    try {
-      const res = await fetch(OPENROUTER_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-          "HTTP-Referer": "https://gtm-app-lovat.vercel.app",
-          "X-Title": "TDP GTM Dashboard",
-        },
-        body: JSON.stringify({ model, messages }),
-      });
-
-      const data = await res.json();
-
-      if (data.error) {
-        lastError = `${model}: ${data.error.message || JSON.stringify(data.error)}`;
-        continue; // try next model
-      }
-
-      return data.choices?.[0]?.message?.content || "";
-    } catch (err) {
-      lastError = `${model}: ${err instanceof Error ? err.message : "unknown error"}`;
-      continue;
-    }
+  const body: Record<string, unknown> = {
+    system_instruction: { parts: [{ text: systemInstruction }] },
+    contents,
+  };
+  if (jsonMode) {
+    body.generationConfig = { responseMimeType: "application/json", maxOutputTokens: 65536 };
   }
 
-  throw new Error(`All models failed. Last error: ${lastError}`);
+  const bodyStr = JSON.stringify(body);
+  let lastErr = "";
+  let res: Response | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    res = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: bodyStr,
+    });
+    if (res.ok) break;
+    lastErr = `${res.status}: ${(await res.text()).slice(0, 300)}`;
+    if (res.status !== 429 && res.status !== 500 && res.status !== 502 && res.status !== 503 && res.status !== 504) {
+      throw new Error(`Gemini API ${lastErr}`);
+    }
+    await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+  }
+  if (!res || !res.ok) {
+    throw new Error(`Gemini API ${lastErr}`);
+  }
+
+  const data = await res.json();
+  const parts = data.candidates?.[0]?.content?.parts;
+  const text = parts?.map((p: { text?: string }) => p.text).filter(Boolean).join("") ?? "";
+  return text;
 }
 
 export async function generateText(systemPrompt: string, userPrompt: string): Promise<string> {
-  return callOpenRouter([
-    { role: "system", content: systemPrompt },
-    { role: "user", content: userPrompt },
-  ]);
+  return callGemini(
+    systemPrompt,
+    [{ role: "user", parts: [{ text: userPrompt }] }],
+    true
+  );
 }
 
 export async function generateFromImage(
@@ -68,16 +73,19 @@ export async function generateFromImage(
   base64Image: string,
   mimeType: string
 ): Promise<string> {
-  return callOpenRouter([
-    { role: "system", content: systemPrompt },
-    {
-      role: "user",
-      content: [
-        { type: "text", text: userPrompt },
-        { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Image}` } },
-      ],
-    },
-  ]);
+  return callGemini(
+    systemPrompt,
+    [
+      {
+        role: "user",
+        parts: [
+          { inline_data: { mime_type: mimeType, data: base64Image } },
+          { text: userPrompt },
+        ],
+      },
+    ],
+    true
+  );
 }
 
 export async function generateChat(
@@ -85,13 +93,12 @@ export async function generateChat(
   history: Array<{ role: string; content: string }>,
   userMessage: string
 ): Promise<string> {
-  const messages: Message[] = [
-    { role: "system", content: systemPrompt },
+  const contents: Content[] = [
     ...history.map((h) => ({
-      role: (h.role === "assistant" ? "assistant" : "user") as "user" | "assistant",
-      content: h.content,
+      role: (h.role === "assistant" ? "model" : "user") as "user" | "model",
+      parts: [{ text: h.content }],
     })),
-    { role: "user", content: userMessage },
+    { role: "user" as const, parts: [{ text: userMessage }] },
   ];
-  return callOpenRouter(messages);
+  return callGemini(systemPrompt, contents, false);
 }

@@ -29,6 +29,7 @@ interface DataSet {
   linkedin_dianne_monthly: Array<{ month: string; impressions: number; saves: number; posts: number; mom_imp: number | null; mom_saves: number | null; partial: number; note: string }>;
   linkedin_tdp_weekly: Array<{ week: string; impressions: number; clicks: number; ctr: number; reactions: number; note: string }>;
   cold_email_campaigns: Array<{ campaign: string; status: string; window: string; sent: number; contacted: number; replies: number; reply_rate: number; interested: number; note: string }>;
+  twitter_weekly: Array<{ week: string; impressions: number; likes: number; engagements: number; bookmarks: number; shares: number; follows: number; unfollows: number; replies: number; reposts: number; profile_visits: number; video_views: number; note: string }>;
 }
 
 const fmt = (n: number) => n.toLocaleString();
@@ -72,7 +73,8 @@ function DashboardContent() {
   if (!data) return <div className="flex items-center justify-center h-96 text-gray-400">Loading...</div>;
 
   const ytMonthly = data.youtube_monthly;
-  const marYT = ytMonthly.find(m => m.month === "Mar 2026");
+  const latestYTMonthly = ytMonthly[ytMonthly.length - 1];
+  const marYT = ytMonthly.find(m => m.month === "Mar 2026") ?? latestYTMonthly;
   const bestDiannePost = [...data.linkedin_dianne_posts].sort((a, b) => b.saves - a.saves)[0];
   const bestEmailRate = [...data.cold_email_campaigns].sort((a, b) => b.reply_rate - a.reply_rate)[0];
   const totalClips = data.shorts_weekly.reduce((s, w) => s + w.clips, 0);
@@ -80,27 +82,121 @@ function DashboardContent() {
   const currentShorts = data.shorts_weekly[data.shorts_weekly.length - 1];
   const currentDianne = data.linkedin_dianne_posts[data.linkedin_dianne_posts.length - 1];
   const currentTDP = data.linkedin_tdp_weekly[data.linkedin_tdp_weekly.length - 1];
+  const currentX = data.twitter_weekly?.[data.twitter_weekly.length - 1];
+
+  // Best performers in the CURRENT month (from latest youtube_monthly.month if valid)
+  const currentMonth = latestYTMonthly?.month ?? "Apr 2026";
+  const monthMatch = (w: string) => {
+    // week strings like "Apr 5–Apr 11" — match by leading month token
+    const [name, year] = currentMonth.split(" ");
+    return w.startsWith(name) || w.includes(`–${name}`);
+  };
+  const dateInMonth = (dateStr: string) => {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return false;
+    const [name, year] = currentMonth.split(" ");
+    const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return d.getUTCMonth() === MONTHS.indexOf(name) && d.getUTCFullYear() === parseInt(year);
+  };
+
+  const ytVideosThisMonth = data.youtube_videos.filter((v) => v.published && dateInMonth(v.published));
+  const bestYTVideoThisMonth = ytVideosThisMonth.sort((a, b) => b.views - a.views)[0];
+  const shortsThisMonth = data.shorts_weekly.filter((w) => monthMatch(w.week));
+  const bestShortsWeek = shortsThisMonth.sort((a, b) => b.total_views - a.total_views)[0];
+  const dianneThisMonth = data.linkedin_dianne_posts.filter((p) => dateInMonth(p.date));
+  const bestDianneThisMonth = dianneThisMonth.sort((a, b) => b.impressions - a.impressions)[0];
+  const tdpThisMonth = data.linkedin_tdp_weekly.filter((w) => monthMatch(w.week));
+  const bestTDPWeek = tdpThisMonth.sort((a, b) => b.impressions - a.impressions)[0];
+  const xThisMonth = data.twitter_weekly?.filter((w) => monthMatch(w.week)) ?? [];
+  const bestXWeek = xThisMonth.sort((a, b) => b.engagements - a.engagements)[0];
 
   return (
     <div>
       {/* ===== OVERVIEW ===== */}
       {section === "overview" && (
         <div>
-          <SectionHeader title="Overview" color="#2E86AB" badge="April 2026" />
+          <SectionHeader title="Overview" color="#2E86AB" badge={currentMonth} />
 
-          {/* KPI Cards */}
-          <div className="grid grid-cols-4 gap-4 mb-7">
+          {/* This week callout */}
+          <div className="bg-white rounded-xl border border-gray-200 border-l-4 border-l-[#117A65] p-5 mb-6">
+            <h3 className="text-[13px] font-bold text-[#117A65] uppercase tracking-wider mb-3">
+              This Week &mdash; {currentYTWeek?.week} <span className="inline-block bg-[#2E86AB] text-white px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ml-2">Partial</span>
+            </h3>
+            <div className="flex gap-7 flex-wrap">
+              {[
+                { label: "YT Long-form", val: fmt(currentYTWeek?.views || 0) },
+                { label: "Shorts", val: fmt(currentShorts?.total_views || 0) },
+                { label: "LI Dianne Imp.", val: fmt(currentDianne?.impressions || 0) },
+                { label: "TDP Page Imp.", val: fmt(currentTDP?.impressions || 0) },
+                { label: "X Impressions", val: fmt(currentX?.impressions || 0) },
+              ].map((s, i) => (
+                <div key={i}>
+                  <div className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">{s.label}</div>
+                  <div className="font-mono text-xl font-bold mt-0.5">{s.val}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Best of the Month per Channel */}
+          <div className="mb-2 flex items-center gap-2">
+            <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Best of {currentMonth}</h3>
+            <div className="flex-1 border-t border-gray-200" />
+          </div>
+          <div className="grid grid-cols-3 gap-4 mb-7">
             {[
-              { label: "YouTube Daily Avg (Mar)", value: fmt(marYT?.daily_avg || 0), color: "var(--yt)", sub: <><Trend value={marYT?.mom_pct || null} /> <span className="ml-1">vs Feb</span></> },
-              { label: "Dianne Best Post Saves", value: fmt(bestDiannePost?.saves || 0), color: "var(--li-dianne)", sub: <>{bestDiannePost?.date} &mdash; #1 all time</> },
-              { label: "Best Email Reply Rate", value: `${bestEmailRate?.reply_rate || 0}%`, color: "var(--email)", sub: <>{bestEmailRate?.campaign?.split(" - ")[0]}</> },
-              { label: "Total Shorts Clips", value: fmt(totalClips), color: "var(--shorts)", sub: <>{data.shorts_weekly.length} weeks tracked</> },
-            ].map((kpi, i) => (
+              {
+                label: "YouTube", color: "#C0392B",
+                has: !!bestYTVideoThisMonth,
+                metric: bestYTVideoThisMonth ? fmt(bestYTVideoThisMonth.views) + " views" : "No new video",
+                title: bestYTVideoThisMonth?.title ?? "—",
+                sub: bestYTVideoThisMonth ? `CTR ${bestYTVideoThisMonth.ctr}% · +${fmt(bestYTVideoThisMonth.subs)} subs` : "",
+              },
+              {
+                label: "Shorts", color: "#E67E22",
+                has: !!bestShortsWeek,
+                metric: bestShortsWeek ? fmt(bestShortsWeek.total_views) + " views" : "No shorts",
+                title: bestShortsWeek ? `${bestShortsWeek.clips} clips · ${bestShortsWeek.week}` : "—",
+                sub: bestShortsWeek ? `${fmt(bestShortsWeek.avg_per_clip)} avg/clip` : "",
+              },
+              {
+                label: "LinkedIn: Dianne", color: "#0077B5",
+                has: !!bestDianneThisMonth,
+                metric: bestDianneThisMonth ? fmt(bestDianneThisMonth.impressions) + " imp" : "No post",
+                title: bestDianneThisMonth ? `${bestDianneThisMonth.date} · ${bestDianneThisMonth.reactions} reactions` : "—",
+                sub: bestDianneThisMonth ? `${bestDianneThisMonth.saves} saves · ${bestDianneThisMonth.comments} comments · +${bestDianneThisMonth.followers} followers` : "",
+              },
+              {
+                label: "LinkedIn: TDP Page", color: "#1A5276",
+                has: !!bestTDPWeek,
+                metric: bestTDPWeek ? fmt(bestTDPWeek.impressions) + " imp" : "No data",
+                title: bestTDPWeek?.week ?? "—",
+                sub: bestTDPWeek ? `${fmt(bestTDPWeek.clicks)} clicks · ${bestTDPWeek.ctr}% CTR · ${bestTDPWeek.note || "(no note)"}` : "",
+              },
+              {
+                label: "X (Twitter)", color: "#111111",
+                has: !!bestXWeek,
+                metric: bestXWeek ? fmt(bestXWeek.engagements) + " engagements" : "No data",
+                title: bestXWeek?.week ?? "—",
+                sub: bestXWeek ? `${fmt(bestXWeek.impressions)} imp · +${bestXWeek.follows - bestXWeek.unfollows} net follows` : "",
+              },
+              {
+                label: "Cold Email", color: "#6C3483",
+                has: !!bestEmailRate,
+                metric: bestEmailRate ? `${bestEmailRate.reply_rate}% reply` : "No data",
+                title: bestEmailRate?.campaign?.split(" - ")[0] ?? "—",
+                sub: bestEmailRate ? `${fmt(bestEmailRate.sent)} sent · ${bestEmailRate.interested} interested` : "",
+              },
+            ].map((c, i) => (
               <div key={i} className="bg-white rounded-xl p-5 border border-gray-200 relative overflow-hidden">
-                <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: kpi.color }} />
-                <div className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 mb-2">{kpi.label}</div>
-                <div className="font-mono text-[28px] font-bold tracking-tight leading-none" style={{ color: kpi.color }}>{kpi.value}</div>
-                <div className="text-xs text-gray-500 mt-1.5 flex items-center gap-1.5">{kpi.sub}</div>
+                <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: c.color }} />
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: c.color }}>{c.label}</span>
+                  {!c.has && <span className="text-[10px] text-gray-400">no data this month</span>}
+                </div>
+                <div className="font-mono text-xl font-bold mb-1">{c.metric}</div>
+                <div className="text-[12px] text-gray-700 font-medium leading-snug mb-1 line-clamp-2">{c.title}</div>
+                {c.sub && <div className="text-[11px] text-gray-500">{c.sub}</div>}
               </div>
             ))}
           </div>
@@ -115,25 +211,49 @@ function DashboardContent() {
             </div>
           </div>
 
-          {/* This week callout */}
-          <div className="bg-white rounded-xl border border-gray-200 border-l-4 border-l-[#117A65] p-5 mb-6">
-            <h3 className="text-[13px] font-bold text-[#117A65] uppercase tracking-wider mb-3">
-              This Week &mdash; {currentYTWeek?.week} <span className="inline-block bg-[#2E86AB] text-white px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ml-2">Partial</span>
-            </h3>
-            <div className="flex gap-7 flex-wrap">
-              {[
-                { label: "YT Long-form", val: fmt(currentYTWeek?.views || 0) },
-                { label: "Shorts", val: fmt(currentShorts?.total_views || 0) },
-                { label: "LI Dianne Imp.", val: fmt(currentDianne?.impressions || 0) },
-                { label: "LI Dianne Saves", val: fmt(currentDianne?.saves || 0) },
-                { label: "TDP Page Imp.", val: fmt(currentTDP?.impressions || 0) },
-              ].map((s, i) => (
-                <div key={i}>
-                  <div className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">{s.label}</div>
-                  <div className="font-mono text-xl font-bold mt-0.5">{s.val}</div>
-                </div>
-              ))}
-            </div>
+          {/* Insights */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
+            <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-3">What's working</h3>
+            <ul className="space-y-2 text-[13px] text-gray-700">
+              {(() => {
+                const out: string[] = [];
+                // YouTube momentum
+                if (ytMonthly.length >= 2) {
+                  const last = ytMonthly[ytMonthly.length - 1];
+                  const prev = ytMonthly[ytMonthly.length - 2];
+                  if (last.mom_pct !== null) {
+                    out.push(`YouTube daily views are ${last.mom_pct >= 0 ? "up" : "down"} ${Math.abs(last.mom_pct)}% month-over-month (${fmt(last.daily_avg)} vs ${fmt(prev.daily_avg)} daily avg).`);
+                  }
+                }
+                // Top Dianne post context
+                if (bestDianneThisMonth) {
+                  out.push(`Dianne's best ${currentMonth} post had ${fmt(bestDianneThisMonth.impressions)} impressions with ${bestDianneThisMonth.reactions} reactions — ${((bestDianneThisMonth.reactions / Math.max(bestDianneThisMonth.impressions, 1)) * 100).toFixed(2)}% reaction rate.`);
+                }
+                // TDP growth
+                const tdpSorted = [...(data.linkedin_tdp_weekly ?? [])];
+                if (tdpSorted.length >= 2) {
+                  const lastTDP = tdpSorted[tdpSorted.length - 1];
+                  if (lastTDP.ctr > 30) out.push(`TDP Page CTR is unusually high (${lastTDP.ctr}%) — likely a small audience base with high-intent clicks.`);
+                }
+                // X spike detection
+                const xw = data.twitter_weekly ?? [];
+                if (xw.length > 0) {
+                  const maxX = xw.reduce((a, b) => (a.engagements > b.engagements ? a : b));
+                  const avgX = xw.reduce((s, w) => s + w.engagements, 0) / xw.length;
+                  if (maxX.engagements > avgX * 3) {
+                    out.push(`X had a breakout week ${maxX.week}: ${fmt(maxX.engagements)} engagements (~${Math.round(maxX.engagements / Math.max(avgX, 1))}× your average), net +${maxX.follows - maxX.unfollows} follows.`);
+                  }
+                }
+                // Best video overall
+                const allVids = [...data.youtube_videos].sort((a, b) => b.views - a.views);
+                if (allVids[0]) {
+                  out.push(`Top video all-time: "${allVids[0].title}" — ${fmt(allVids[0].views)} views, ${allVids[0].ctr}% CTR.`);
+                }
+                return out.length > 0 ? out.map((t, i) => (
+                  <li key={i} className="flex gap-2"><span className="text-gray-400">•</span><span>{t}</span></li>
+                )) : <li className="text-gray-400 italic">Not enough data yet for insights.</li>;
+              })()}
+            </ul>
           </div>
         </div>
       )}
@@ -285,20 +405,65 @@ function DashboardContent() {
         <div>
           <SectionHeader title="LinkedIn: Dianne" color="#0077B5" badge="Personal Brand" />
 
-          {/* KPI Strip */}
-          <div className="flex gap-6 mb-6 flex-wrap">
-            {[
-              { label: "Best Month Impressions", value: fmt(Math.max(...data.linkedin_dianne_monthly.map(m => m.impressions))), sub: "Dec 2025" },
-              { label: "Best Post Saves", value: fmt(bestDiannePost?.saves || 0), sub: bestDiannePost?.date },
-              { label: "Mar Recovery", value: "+123%", sub: "Imp. MoM vs Feb", color: "#1E8449" },
-              { label: "Mar Saves Recovery", value: "+164%", sub: "Saves MoM vs Feb", color: "#1E8449" },
-            ].map((s, i) => (
-              <div key={i} className="bg-white rounded-lg border border-gray-200 px-4 py-3.5 min-w-[160px]">
-                <div className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-1">{s.label}</div>
-                <div className="font-mono text-xl font-bold" style={{ color: s.color }}>{s.value}</div>
-                {s.sub && <div className="text-[11px] text-gray-500 mt-0.5">{s.sub}</div>}
+          {/* Top performers this month */}
+          {dianneThisMonth.length > 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 border-l-4 border-l-[#0077B5] p-5 mb-6">
+              <div className="flex items-center gap-2 mb-3">
+                <h3 className="text-[11px] font-bold uppercase tracking-wider text-[#0077B5]">Top Posts — {currentMonth}</h3>
               </div>
-            ))}
+              <div className="grid grid-cols-3 gap-4">
+                {[...dianneThisMonth].sort((a, b) => b.impressions - a.impressions).slice(0, 3).map((p, i) => (
+                  <div key={i} className="border border-gray-200 rounded-lg p-3.5">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">#{i + 1} · {p.date}</span>
+                      <span className="text-[10px] text-gray-400">{(p as { post_time?: string }).post_time}</span>
+                    </div>
+                    <div className="font-mono text-lg font-bold mb-1.5">{fmt(p.impressions)} <span className="text-[11px] text-gray-500 font-sans font-normal">imp</span></div>
+                    <div className="flex gap-3 text-[11px] text-gray-600">
+                      <span><strong>{p.reactions}</strong> react</span>
+                      <span><strong>{p.saves}</strong> saves</span>
+                      <span><strong>{(p as { comments?: number }).comments ?? 0}</strong> cmts</span>
+                      <span>+<strong>{p.followers}</strong> foll.</span>
+                    </div>
+                    <div className="text-[11px] text-gray-500 mt-1.5 italic">{p.note || "—"}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Insights */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
+            <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-3">What's driving growth</h3>
+            <ul className="space-y-2 text-[13px] text-gray-700">
+              {(() => {
+                const out: string[] = [];
+                const posts = data.linkedin_dianne_posts;
+                const monthly = data.linkedin_dianne_monthly;
+                if (monthly.length >= 2) {
+                  const last = monthly[monthly.length - 1];
+                  if (last.mom_imp !== null && last.mom_imp !== undefined) {
+                    out.push(`${last.month}: ${last.mom_imp >= 0 ? "up" : "down"} ${Math.abs(last.mom_imp)}% on impressions, ${last.mom_saves !== null ? (last.mom_saves >= 0 ? "up" : "down") + " " + Math.abs(last.mom_saves) + "% on saves" : "no saves trend"}.`);
+                  }
+                }
+                // Find breakout post
+                const avgImp = posts.reduce((s, p) => s + p.impressions, 0) / Math.max(posts.length, 1);
+                const breakouts = posts.filter((p) => p.impressions > avgImp * 2);
+                if (breakouts.length > 0) {
+                  const best = breakouts.sort((a, b) => b.impressions - a.impressions)[0];
+                  out.push(`Breakout post ${best.date} drove ${fmt(best.impressions)} impressions (~${Math.round(best.impressions / Math.max(avgImp, 1))}× average). Note: "${best.note || "no note"}".`);
+                }
+                // Reactions per impression
+                const engaged = [...posts].sort((a, b) => (b.reactions / Math.max(b.impressions, 1)) - (a.reactions / Math.max(a.impressions, 1)));
+                if (engaged[0]) {
+                  const er = ((engaged[0].reactions / Math.max(engaged[0].impressions, 1)) * 100).toFixed(2);
+                  out.push(`Highest engagement rate: ${engaged[0].date} — ${er}% reactions per impression. ${engaged[0].note ? `(${engaged[0].note})` : ""}`);
+                }
+                return out.length > 0 ? out.map((t, i) => (
+                  <li key={i} className="flex gap-2"><span className="text-gray-400">•</span><span>{t}</span></li>
+                )) : <li className="text-gray-400 italic">Not enough data yet.</li>;
+              })()}
+            </ul>
           </div>
 
           {/* Chart */}
@@ -376,6 +541,51 @@ function DashboardContent() {
       {section === "linkedin-tdp" && (
         <div>
           <SectionHeader title="LinkedIn: TDP Page" color="#1A5276" badge="Company Page" />
+
+          {/* Top weeks */}
+          <div className="bg-white rounded-xl border border-gray-200 border-l-4 border-l-[#1A5276] p-5 mb-6">
+            <h3 className="text-[11px] font-bold uppercase tracking-wider text-[#1A5276] mb-3">Top Weeks by Impressions</h3>
+            <div className="grid grid-cols-3 gap-4">
+              {[...data.linkedin_tdp_weekly].sort((a, b) => b.impressions - a.impressions).slice(0, 3).map((w, i) => (
+                <div key={i} className="border border-gray-200 rounded-lg p-3.5">
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">#{i + 1} · {w.week}</div>
+                  <div className="font-mono text-lg font-bold mb-1">{fmt(w.impressions)} <span className="text-[11px] text-gray-500 font-sans font-normal">imp</span></div>
+                  <div className="text-[11px] text-gray-600">{fmt(w.clicks)} clicks · {w.ctr}% CTR · {w.reactions} reactions</div>
+                  <div className="text-[11px] text-gray-500 mt-1.5 italic">{w.note || "—"}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Insights */}
+          <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
+            <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-3">What's driving the numbers</h3>
+            <ul className="space-y-2 text-[13px] text-gray-700">
+              {(() => {
+                const out: string[] = [];
+                const weeks = data.linkedin_tdp_weekly;
+                if (weeks.length === 0) return <li className="text-gray-400 italic">No data.</li>;
+                const sorted = [...weeks].sort((a, b) => b.impressions - a.impressions);
+                const top = sorted[0];
+                if (top?.note) out.push(`Best week "${top.week}" was driven by: ${top.note}. ${fmt(top.impressions)} imp, ${top.ctr}% CTR.`);
+                const noPost = weeks.filter((w) => /no post/i.test(w.note ?? ""));
+                const withPost = weeks.filter((w) => w.note && !/no post/i.test(w.note));
+                if (noPost.length > 0 && withPost.length > 0) {
+                  const avgNoPost = noPost.reduce((s, w) => s + w.impressions, 0) / noPost.length;
+                  const avgPost = withPost.reduce((s, w) => s + w.impressions, 0) / withPost.length;
+                  out.push(`Weeks with a post average ${fmt(Math.round(avgPost))} imp vs ${fmt(Math.round(avgNoPost))} without — ~${Math.round((avgPost / Math.max(avgNoPost, 1)) * 100) / 100}× lift from posting.`);
+                }
+                const latest = weeks[weeks.length - 1];
+                if (latest && latest.ctr > 50) {
+                  out.push(`Latest week (${latest.week}) has ${latest.ctr}% CTR — very high, suggests a tight audience seeing targeted content.`);
+                }
+                return out.length > 0 ? out.map((t, i) => (
+                  <li key={i} className="flex gap-2"><span className="text-gray-400">•</span><span>{t}</span></li>
+                )) : <li className="text-gray-400 italic">Add notes to weeks to unlock insights.</li>;
+              })()}
+            </ul>
+          </div>
+
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
             <div className="px-4 py-3 text-[13px] font-semibold border-b border-gray-200">Weekly Performance</div>
             <table className="w-full text-[13px]">
@@ -403,6 +613,73 @@ function DashboardContent() {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* ===== X (TWITTER) ===== */}
+      {section === "twitter" && (
+        <div>
+          <SectionHeader title="X (Twitter)" color="#111111" badge={`${data.twitter_weekly?.length || 0} weeks`} />
+          {!data.twitter_weekly || data.twitter_weekly.length === 0 ? (
+            <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">
+              No X data yet. Upload <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">account_overview_analytics.csv</code> to see weekly metrics.
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-4 gap-4 mb-6">
+                {(() => {
+                  const weeks = data.twitter_weekly;
+                  const latest = weeks[weeks.length - 1];
+                  const totalImp = weeks.reduce((s, w) => s + w.impressions, 0);
+                  const totalEng = weeks.reduce((s, w) => s + w.engagements, 0);
+                  const netFollows = weeks.reduce((s, w) => s + w.follows - w.unfollows, 0);
+                  const engRate = totalImp > 0 ? ((totalEng / totalImp) * 100).toFixed(2) : "0";
+                  return [
+                    { label: "Latest Week Impressions", value: fmt(latest.impressions), sub: latest.week },
+                    { label: "Total Engagements", value: fmt(totalEng), sub: `${engRate}% rate` },
+                    { label: "Net New Follows", value: fmt(netFollows), sub: `${weeks.length} weeks` },
+                    { label: "Latest Week Profile Visits", value: fmt(latest.profile_visits), sub: latest.week },
+                  ].map((kpi, i) => (
+                    <div key={i} className="bg-white rounded-xl p-5 border border-gray-200 relative overflow-hidden">
+                      <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: "#111111" }} />
+                      <div className="text-[11px] text-gray-500 uppercase tracking-wider font-semibold mb-2">{kpi.label}</div>
+                      <div className="font-mono text-3xl font-bold leading-none mb-1.5">{kpi.value}</div>
+                      <div className="text-[11px] text-gray-500">{kpi.sub}</div>
+                    </div>
+                  ));
+                })()}
+              </div>
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="px-4 py-3 text-[13px] font-semibold border-b border-gray-200">Weekly Performance</div>
+                <table className="w-full text-[13px]">
+                  <thead>
+                    <tr className="bg-gray-50">
+                      {["Week", "Impressions", "Engagements", "Likes", "Replies", "Reposts", "Follows (net)", "Profile Visits"].map(h => (
+                        <th key={h} className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.twitter_weekly.map((w, i) => {
+                      const isCurrent = i === data.twitter_weekly.length - 1;
+                      return (
+                        <tr key={i} className={isCurrent ? "bg-gray-50 border-l-[3px] border-l-[#111111]" : ""}>
+                          <td className="px-3.5 py-2.5">{w.week} {isCurrent && <span className="inline-block bg-[#111111] text-white px-1.5 py-0.5 rounded text-[9px] font-bold uppercase">Current</span>}</td>
+                          <td className="px-3.5 py-2.5 font-mono text-xs">{fmt(w.impressions)}</td>
+                          <td className="px-3.5 py-2.5 font-mono text-xs">{fmt(w.engagements)}</td>
+                          <td className="px-3.5 py-2.5 font-mono text-xs">{fmt(w.likes)}</td>
+                          <td className="px-3.5 py-2.5 font-mono text-xs">{fmt(w.replies)}</td>
+                          <td className="px-3.5 py-2.5 font-mono text-xs">{fmt(w.reposts)}</td>
+                          <td className="px-3.5 py-2.5 font-mono text-xs">{w.follows - w.unfollows >= 0 ? "+" : ""}{w.follows - w.unfollows}</td>
+                          <td className="px-3.5 py-2.5 font-mono text-xs">{fmt(w.profile_visits)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </div>
       )}
 
