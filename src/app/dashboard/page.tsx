@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState, Component, type ReactNode } from "react";
+import { Suspense, useEffect, useState, Component, Fragment, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { YTWeeklyChart, YTMonthlySparkline, ShortsChart, DianneChart } from "@/components/Charts";
 
@@ -821,14 +821,6 @@ function DashboardContent() {
       {section === "monthly-growth" && (() => {
         // Build per-month rollups across all channels
         const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-        type MonthlyRollup = {
-          month: string;
-          yt?: typeof ytMonthly[number];
-          shorts: { views: number; clips: number; weeks: number };
-          dianne?: typeof data.linkedin_dianne_monthly[number];
-          tdp: { impressions: number; clicks: number; reactions: number; weeks: number };
-          x: { impressions: number; engagements: number; follows: number; weeks: number };
-        };
         const monthStartsWith = (week: string, month: string) => {
           const [name] = month.split(" ");
           return week.startsWith(name) || week.includes(`–${name}`);
@@ -841,116 +833,204 @@ function DashboardContent() {
           return parseInt(y) * 12 + MONTHS.indexOf(n);
         };
         const sortedMonths = [...allMonths].sort((a, b) => monthKey(a) - monthKey(b));
+        // Cap to last 6 months for readability
+        const months = sortedMonths.slice(-6);
 
-        const rollups: MonthlyRollup[] = sortedMonths.map((month) => {
+        // Precompute per-month data per channel
+        const byMonth = months.map((month) => {
           const yt = ytMonthly.find((m) => m.month === month);
           const shortsSlice = data.shorts_weekly.filter((w) => monthStartsWith(w.week, month));
           const tdpSlice = data.linkedin_tdp_weekly.filter((w) => monthStartsWith(w.week, month));
           const xSlice = data.twitter_weekly?.filter((w) => monthStartsWith(w.week, month)) ?? [];
           const dianne = data.linkedin_dianne_monthly.find((m) => m.month === month);
+          const shortsClips = shortsSlice.reduce((s, w) => s + w.clips, 0);
+          const shortsViews = shortsSlice.reduce((s, w) => s + w.total_views, 0);
+          const tdpImp = tdpSlice.reduce((s, w) => s + w.impressions, 0);
+          const tdpClicks = tdpSlice.reduce((s, w) => s + w.clicks, 0);
+          const tdpCtr = tdpImp > 0 ? (tdpClicks / tdpImp) * 100 : 0;
+          const xImp = xSlice.reduce((s, w) => s + w.impressions, 0);
+          const xEng = xSlice.reduce((s, w) => s + w.engagements, 0);
+          const xNetFollows = xSlice.reduce((s, w) => s + w.follows - w.unfollows, 0);
           return {
             month, yt, dianne,
-            shorts: {
-              views: shortsSlice.reduce((s, w) => s + w.total_views, 0),
-              clips: shortsSlice.reduce((s, w) => s + w.clips, 0),
-              weeks: shortsSlice.length,
-            },
-            tdp: {
-              impressions: tdpSlice.reduce((s, w) => s + w.impressions, 0),
-              clicks: tdpSlice.reduce((s, w) => s + w.clicks, 0),
-              reactions: tdpSlice.reduce((s, w) => s + w.reactions, 0),
-              weeks: tdpSlice.length,
-            },
-            x: {
-              impressions: xSlice.reduce((s, w) => s + w.impressions, 0),
-              engagements: xSlice.reduce((s, w) => s + w.engagements, 0),
-              follows: xSlice.reduce((s, w) => s + w.follows - w.unfollows, 0),
-              weeks: xSlice.length,
+            isPartial: yt?.partial === 1,
+            hasShorts: shortsSlice.length > 0,
+            hasTDP: tdpSlice.length > 0,
+            hasX: xSlice.length > 0,
+            metrics: {
+              yt_daily_avg: yt?.daily_avg ?? null,
+              yt_views: yt?.views ?? null,
+              shorts_avg_per_clip: shortsClips > 0 ? Math.round(shortsViews / shortsClips) : null,
+              shorts_total_views: shortsSlice.length > 0 ? shortsViews : null,
+              shorts_clips: shortsSlice.length > 0 ? shortsClips : null,
+              dianne_imp_per_post: dianne && dianne.posts > 0 ? Math.round(dianne.impressions / dianne.posts) : null,
+              dianne_saves_per_post: dianne && dianne.posts > 0 ? Math.round(dianne.saves / dianne.posts) : null,
+              dianne_posts: dianne?.posts ?? null,
+              tdp_imp_per_week: tdpSlice.length > 0 ? Math.round(tdpImp / tdpSlice.length) : null,
+              tdp_ctr: tdpSlice.length > 0 ? Math.round(tdpCtr * 100) / 100 : null,
+              x_eng_per_week: xSlice.length > 0 ? Math.round(xEng / xSlice.length) : null,
+              x_follows_per_week: xSlice.length > 0 ? Math.round(xNetFollows / xSlice.length) : null,
             },
           };
         });
 
-        const pct = (curr: number, prev: number) => prev > 0 ? Math.round(((curr - prev) / prev) * 1000) / 10 : null;
+        // Pivot rows
+        type MetricDef = {
+          label: string;
+          key: keyof typeof byMonth[number]["metrics"];
+          unit: string;
+          kind: "count" | "ratio" | "pct";
+        };
+        type ChannelGroup = { channel: string; color: string; metrics: MetricDef[] };
+        const groups: ChannelGroup[] = [
+          {
+            channel: "YouTube Long-form", color: "#C0392B",
+            metrics: [
+              { label: "Daily Avg Views", key: "yt_daily_avg", unit: "/day", kind: "ratio" },
+              { label: "Raw Monthly Views", key: "yt_views", unit: "views", kind: "count" },
+            ],
+          },
+          {
+            channel: "YouTube Shorts", color: "#E67E22",
+            metrics: [
+              { label: "Avg Views/Clip", key: "shorts_avg_per_clip", unit: "/clip", kind: "ratio" },
+              { label: "Total Views", key: "shorts_total_views", unit: "views", kind: "count" },
+              { label: "Clips Published", key: "shorts_clips", unit: "clips", kind: "count" },
+            ],
+          },
+          {
+            channel: "LinkedIn: Dianne", color: "#0077B5",
+            metrics: [
+              { label: "Impressions/Post", key: "dianne_imp_per_post", unit: "/post", kind: "ratio" },
+              { label: "Saves/Post", key: "dianne_saves_per_post", unit: "/post", kind: "ratio" },
+              { label: "Posts Count", key: "dianne_posts", unit: "posts", kind: "count" },
+            ],
+          },
+          {
+            channel: "LinkedIn: TDP Page", color: "#1A5276",
+            metrics: [
+              { label: "Impressions/Week", key: "tdp_imp_per_week", unit: "/wk", kind: "ratio" },
+              { label: "CTR", key: "tdp_ctr", unit: "%", kind: "pct" },
+            ],
+          },
+          {
+            channel: "X (Twitter)", color: "#111111",
+            metrics: [
+              { label: "Engagements/Week", key: "x_eng_per_week", unit: "/wk", kind: "ratio" },
+              { label: "Net Follows/Week", key: "x_follows_per_week", unit: "/wk", kind: "ratio" },
+            ],
+          },
+        ];
+
+        const bgForMoM = (mom: number | null): string => {
+          if (mom === null) return "bg-gray-50";
+          if (mom >= 5) return "bg-[#D5F5E3]";
+          if (mom <= -5) return "bg-[#FADBD8]";
+          return "bg-[#FEF9E7]";
+        };
+        const textForMoM = (mom: number | null): string => {
+          if (mom === null) return "text-gray-500";
+          if (mom >= 5) return "text-[#1E8449]";
+          if (mom <= -5) return "text-[#C0392B]";
+          return "text-[#b7950b]";
+        };
+        const arrowForMoM = (mom: number | null): string => {
+          if (mom === null) return "";
+          if (mom >= 5) return "▲";
+          if (mom <= -5) return "▼";
+          return "→";
+        };
+        const formatValue = (value: number | null, kind: MetricDef["kind"], unit: string): string => {
+          if (value === null) return "—";
+          if (kind === "pct") return `${value}%`;
+          return `${fmt(value)}${unit.startsWith("/") ? unit : ""}`;
+        };
 
         return (
           <div>
-            <SectionHeader title="Monthly Growth" color="#117A65" badge={sortedMonths.length > 0 ? `${sortedMonths[0]} – ${sortedMonths[sortedMonths.length-1]}` : ""} />
+            <SectionHeader title="Monthly Growth" color="#117A65" badge={months.length > 0 ? `${months[0]} – ${months[months.length-1]}` : ""} />
 
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
               <div className="overflow-x-auto">
                 <table className="w-full text-[13px]">
                   <thead>
-                    <tr className="bg-gray-50">
-                      <th className="sticky left-0 bg-gray-50 text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Month</th>
-                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider font-semibold" style={{ color: "#C0392B" }}>YT Views</th>
-                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500">MoM</th>
-                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider font-semibold" style={{ color: "#E67E22" }}>Shorts Views</th>
-                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500">MoM</th>
-                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider font-semibold" style={{ color: "#0077B5" }}>LI Dianne Imp</th>
-                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500">MoM</th>
-                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider font-semibold" style={{ color: "#1A5276" }}>TDP Page Imp</th>
-                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500">MoM</th>
-                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider font-semibold" style={{ color: "#111111" }}>X Eng</th>
-                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500">MoM</th>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="sticky left-0 bg-gray-50 text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold min-w-[220px]">Channel / Metric</th>
+                      {months.map((m, i) => {
+                        const mo = byMonth[i];
+                        return (
+                          <th key={m} className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold min-w-[120px]">
+                            <div>{m}</div>
+                            {mo.isPartial && <div className="text-[9px] text-[#b7950b] normal-case font-normal mt-0.5">Partial · actual</div>}
+                          </th>
+                        );
+                      })}
                     </tr>
                   </thead>
                   <tbody>
-                    {rollups.map((r, i) => {
-                      const prev = i > 0 ? rollups[i - 1] : null;
-                      return (
-                        <tr key={r.month} className={r.yt?.partial ? "bg-[#e8f8f5]" : ""}>
-                          <td className="sticky left-0 bg-inherit px-3.5 py-2.5 font-semibold">
-                            {r.month}
-                            {r.yt?.partial && <span className="inline-block bg-[#2E86AB] text-white px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ml-1.5">Partial</span>}
+                    {groups.map((g) => (
+                      <Fragment key={g.channel}>
+                        {/* Channel header row */}
+                        <tr>
+                          <td
+                            colSpan={months.length + 1}
+                            className="sticky left-0 text-white text-[11px] font-bold uppercase tracking-wider px-3.5 py-1.5"
+                            style={{ background: g.color }}
+                          >
+                            {g.channel}
                           </td>
-                          <td className="px-3.5 py-2.5 font-mono text-xs">{r.yt ? fmt(r.yt.views) : "—"}</td>
-                          <td className="px-3.5 py-2.5"><Trend value={r.yt?.mom_pct ?? null} /></td>
-                          <td className="px-3.5 py-2.5 font-mono text-xs">{r.shorts.weeks > 0 ? fmt(r.shorts.views) : "—"}</td>
-                          <td className="px-3.5 py-2.5"><Trend value={prev && prev.shorts.weeks > 0 && r.shorts.weeks > 0 ? pct(r.shorts.views, prev.shorts.views) : null} /></td>
-                          <td className="px-3.5 py-2.5 font-mono text-xs">{r.dianne ? fmt(r.dianne.impressions) : "—"}</td>
-                          <td className="px-3.5 py-2.5"><Trend value={r.dianne?.mom_imp ?? null} /></td>
-                          <td className="px-3.5 py-2.5 font-mono text-xs">{r.tdp.weeks > 0 ? fmt(r.tdp.impressions) : "—"}</td>
-                          <td className="px-3.5 py-2.5"><Trend value={prev && prev.tdp.weeks > 0 && r.tdp.weeks > 0 ? pct(r.tdp.impressions, prev.tdp.impressions) : null} /></td>
-                          <td className="px-3.5 py-2.5 font-mono text-xs">{r.x.weeks > 0 ? fmt(r.x.engagements) : "—"}</td>
-                          <td className="px-3.5 py-2.5"><Trend value={prev && prev.x.weeks > 0 && r.x.weeks > 0 ? pct(r.x.engagements, prev.x.engagements) : null} /></td>
                         </tr>
-                      );
-                    })}
+                        {g.metrics.map((metric, mi) => (
+                          <tr key={`${g.channel}-${metric.label}`} className="border-b border-gray-100">
+                            <td className="sticky left-0 bg-white px-3.5 py-2.5 text-[12px] text-gray-700 border-l-4" style={{ borderLeftColor: g.color }}>
+                              {metric.label} {metric.kind !== "count" && <span className="text-[10px] text-gray-400">MoM%</span>}
+                            </td>
+                            {byMonth.map((mo, i) => {
+                              const v = mo.metrics[metric.key];
+                              const prevV = i > 0 ? byMonth[i - 1].metrics[metric.key] : null;
+                              const mom = v !== null && prevV !== null && prevV > 0 ? Math.round(((v - prevV) / prevV) * 1000) / 10 : null;
+                              const isBaseline = i === 0 || prevV === null;
+                              const bg = metric.kind === "count" ? "" : bgForMoM(mom);
+                              const tc = metric.kind === "count" ? "text-gray-700" : textForMoM(mom);
+                              const arrow = metric.kind === "count" ? "" : arrowForMoM(mom);
+                              return (
+                                <td key={mo.month} className={`px-3.5 py-2.5 align-top ${bg}`}>
+                                  {v === null ? (
+                                    <span className="text-gray-400">—</span>
+                                  ) : (
+                                    <>
+                                      {metric.kind !== "count" && (
+                                        isBaseline ? (
+                                          <div className="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">baseline</div>
+                                        ) : mom !== null ? (
+                                          <div className={`text-[12px] font-semibold flex items-center gap-1 ${tc}`}>
+                                            <span>{arrow}</span>
+                                            <span>{Math.abs(mom)}%</span>
+                                          </div>
+                                        ) : null
+                                      )}
+                                      <div className="font-mono text-[12px] font-semibold text-gray-900">
+                                        {formatValue(v, metric.kind, metric.unit)}
+                                      </div>
+                                    </>
+                                  )}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </Fragment>
+                    ))}
                   </tbody>
                 </table>
               </div>
             </div>
 
-            {/* Per-month cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-              {rollups.slice(-6).map((r) => (
-                <div key={r.month} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                  <div className="px-4 py-3 bg-[#117A65] text-white text-[13px] font-bold flex items-center justify-between">
-                    <span>{r.month}</span>
-                    {r.yt?.partial && <span className="text-[9px] bg-white/20 px-1.5 py-0.5 rounded uppercase">Partial</span>}
-                  </div>
-                  <div className="p-4 space-y-3">
-                    {[
-                      { k: "YouTube", color: "#C0392B", val: r.yt ? fmt(r.yt.views) + " views" : "—", sub: r.yt ? `${fmt(r.yt.daily_avg)}/day` : "", mom: r.yt?.mom_pct ?? null },
-                      { k: "Shorts", color: "#E67E22", val: r.shorts.weeks > 0 ? fmt(r.shorts.views) + " views" : "—", sub: r.shorts.weeks > 0 ? `${r.shorts.clips} clips` : "" },
-                      { k: "LI Dianne", color: "#0077B5", val: r.dianne ? fmt(r.dianne.impressions) + " imp" : "—", sub: r.dianne ? `${r.dianne.saves} saves · ${r.dianne.posts} posts` : "", mom: r.dianne?.mom_imp ?? null },
-                      { k: "TDP Page", color: "#1A5276", val: r.tdp.weeks > 0 ? fmt(r.tdp.impressions) + " imp" : "—", sub: r.tdp.weeks > 0 ? `${fmt(r.tdp.clicks)} clicks` : "" },
-                      { k: "X", color: "#111111", val: r.x.weeks > 0 ? fmt(r.x.engagements) + " eng" : "—", sub: r.x.weeks > 0 ? `${fmt(r.x.impressions)} imp · +${r.x.follows} foll.` : "" },
-                    ].map((row) => (
-                      <div key={row.k} className="flex items-start justify-between text-[12px]">
-                        <div>
-                          <div className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: row.color }}>{row.k}</div>
-                          <div className="font-mono text-[13px] font-bold">{row.val}</div>
-                          {row.sub && <div className="text-[10px] text-gray-500">{row.sub}</div>}
-                        </div>
-                        {"mom" in row && row.mom !== null && row.mom !== undefined && (
-                          <Trend value={row.mom} />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
+            <div className="flex gap-4 text-[11px] text-gray-500 mb-2">
+              <span className="flex items-center gap-1.5"><span className="w-3 h-3 bg-[#D5F5E3] rounded-sm inline-block" /> ≥ +5% MoM</span>
+              <span className="flex items-center gap-1.5"><span className="w-3 h-3 bg-[#FEF9E7] rounded-sm inline-block" /> flat (±5%)</span>
+              <span className="flex items-center gap-1.5"><span className="w-3 h-3 bg-[#FADBD8] rounded-sm inline-block" /> ≤ -5% MoM</span>
+              <span className="flex items-center gap-1.5"><span className="w-3 h-3 bg-gray-50 rounded-sm inline-block border border-gray-200" /> no prior month (baseline)</span>
             </div>
           </div>
         );
