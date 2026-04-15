@@ -61,16 +61,112 @@ export default function Dashboard() {
   );
 }
 
+type TimeRange = "4w" | "3m" | "6m" | "all";
+const RANGE_LABELS: Record<TimeRange, string> = { "4w": "Last 4 weeks", "3m": "Last 3 months", "6m": "Last 6 months", all: "All time" };
+
+function parseWeekStart(week: string): Date | null {
+  // "Mar 29–Apr 4" — take the left side; assume current-ish year
+  const left = week.split("–")[0].trim();
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const m = left.match(/^(\w{3})\s+(\d+)$/);
+  if (!m) return null;
+  const mi = MONTHS.indexOf(m[1]);
+  if (mi < 0) return null;
+  const now = new Date();
+  // If month is greater than current month, assume previous year (wraparound)
+  const year = mi > now.getUTCMonth() ? now.getUTCFullYear() - 1 : now.getUTCFullYear();
+  return new Date(Date.UTC(year, mi, parseInt(m[2])));
+}
+function parseMonth(month: string): Date | null {
+  const [name, year] = month.split(" ");
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const mi = MONTHS.indexOf(name);
+  if (mi < 0 || !year) return null;
+  return new Date(Date.UTC(parseInt(year), mi, 1));
+}
+
+function cutoff(range: TimeRange): Date | null {
+  if (range === "all") return null;
+  const now = new Date();
+  const c = new Date(now);
+  if (range === "4w") c.setUTCDate(c.getUTCDate() - 28);
+  else if (range === "3m") c.setUTCMonth(c.getUTCMonth() - 3);
+  else if (range === "6m") c.setUTCMonth(c.getUTCMonth() - 6);
+  return c;
+}
+
+function filterByWeek<T extends { week: string }>(rows: T[], range: TimeRange): T[] {
+  const c = cutoff(range);
+  if (!c) return rows;
+  return rows.filter((r) => {
+    const d = parseWeekStart(r.week);
+    return d === null || d >= c;
+  });
+}
+function filterByMonth<T extends { month: string }>(rows: T[], range: TimeRange): T[] {
+  const c = cutoff(range);
+  if (!c) return rows;
+  return rows.filter((r) => {
+    const d = parseMonth(r.month);
+    return d === null || d >= c;
+  });
+}
+function filterByDate<T extends { date?: string; published?: string }>(rows: T[], range: TimeRange, key: "date" | "published"): T[] {
+  const c = cutoff(range);
+  if (!c) return rows;
+  return rows.filter((r) => {
+    const raw = r[key];
+    if (!raw) return true;
+    const d = new Date(raw);
+    return isNaN(d.getTime()) || d >= c;
+  });
+}
+
+function FilterBar({ range, onChange }: { range: TimeRange; onChange: (r: TimeRange) => void }) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 px-4 py-2.5 mb-5 flex items-center gap-3 text-[12px]">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Time range</span>
+      <div className="flex gap-1">
+        {(Object.keys(RANGE_LABELS) as TimeRange[]).map((r) => (
+          <button
+            key={r}
+            onClick={() => onChange(r)}
+            className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
+              range === r ? "bg-[#2E86AB] text-white" : "text-gray-600 hover:bg-gray-100"
+            }`}
+          >
+            {RANGE_LABELS[r]}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function DashboardContent() {
-  const [data, setData] = useState<DataSet | null>(null);
+  const [rawData, setRawData] = useState<DataSet | null>(null);
+  const [range, setRange] = useState<TimeRange>("6m");
   const searchParams = useSearchParams();
   const section = searchParams.get("tab") || "overview";
 
   useEffect(() => {
-    fetch("/api/data").then(r => r.json()).then(setData);
+    fetch("/api/data").then(r => r.json()).then(setRawData);
   }, []);
 
-  if (!data) return <div className="flex items-center justify-center h-96 text-gray-400">Loading...</div>;
+  if (!rawData) return <div className="flex items-center justify-center h-96 text-gray-400">Loading...</div>;
+
+  // Apply range filter to time-series tables
+  const data: DataSet = {
+    ...rawData,
+    youtube_weekly: filterByWeek(rawData.youtube_weekly, range),
+    youtube_monthly: filterByMonth(rawData.youtube_monthly, range),
+    youtube_videos: filterByDate(rawData.youtube_videos, range, "published"),
+    shorts_weekly: filterByWeek(rawData.shorts_weekly, range),
+    linkedin_dianne_posts: filterByDate(rawData.linkedin_dianne_posts, range, "date"),
+    linkedin_dianne_monthly: filterByMonth(rawData.linkedin_dianne_monthly, range),
+    linkedin_tdp_weekly: filterByWeek(rawData.linkedin_tdp_weekly, range),
+    twitter_weekly: rawData.twitter_weekly ? filterByWeek(rawData.twitter_weekly, range) : [],
+  };
 
   const ytMonthly = data.youtube_monthly;
   const latestYTMonthly = ytMonthly[ytMonthly.length - 1];
@@ -112,6 +208,8 @@ function DashboardContent() {
 
   return (
     <div>
+      <FilterBar range={range} onChange={setRange} />
+
       {/* ===== OVERVIEW ===== */}
       {section === "overview" && (
         <div>
@@ -720,44 +818,143 @@ function DashboardContent() {
       )}
 
       {/* ===== MONTHLY GROWTH ===== */}
-      {section === "monthly-growth" && (
-        <div>
-          <SectionHeader title="Monthly Growth" color="#117A65" badge="Dec 2025 – Apr 2026" />
-          <div className="grid grid-cols-5 gap-3.5 mb-6">
-            {ytMonthly.map((yt, i) => {
-              const li = data.linkedin_dianne_monthly[i];
-              const colors = ["#1B4F72", "#154360", "#1A5276", "#117A65", "#2E86AB"];
-              return (
-                <div key={i} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                  <div className="px-4 py-3 text-white text-[13px] font-bold text-center" style={{ background: colors[i] }}>
-                    {yt.month} {yt.partial ? <span className="inline-block bg-white/20 text-white px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ml-1">Partial</span> : null}
+      {section === "monthly-growth" && (() => {
+        // Build per-month rollups across all channels
+        const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+        type MonthlyRollup = {
+          month: string;
+          yt?: typeof ytMonthly[number];
+          shorts: { views: number; clips: number; weeks: number };
+          dianne?: typeof data.linkedin_dianne_monthly[number];
+          tdp: { impressions: number; clicks: number; reactions: number; weeks: number };
+          x: { impressions: number; engagements: number; follows: number; weeks: number };
+        };
+        const monthStartsWith = (week: string, month: string) => {
+          const [name] = month.split(" ");
+          return week.startsWith(name) || week.includes(`–${name}`);
+        };
+        const allMonths = new Set<string>();
+        ytMonthly.forEach((m) => allMonths.add(m.month));
+        data.linkedin_dianne_monthly.forEach((m) => allMonths.add(m.month));
+        const monthKey = (m: string) => {
+          const [n, y] = m.split(" ");
+          return parseInt(y) * 12 + MONTHS.indexOf(n);
+        };
+        const sortedMonths = [...allMonths].sort((a, b) => monthKey(a) - monthKey(b));
+
+        const rollups: MonthlyRollup[] = sortedMonths.map((month) => {
+          const yt = ytMonthly.find((m) => m.month === month);
+          const shortsSlice = data.shorts_weekly.filter((w) => monthStartsWith(w.week, month));
+          const tdpSlice = data.linkedin_tdp_weekly.filter((w) => monthStartsWith(w.week, month));
+          const xSlice = data.twitter_weekly?.filter((w) => monthStartsWith(w.week, month)) ?? [];
+          const dianne = data.linkedin_dianne_monthly.find((m) => m.month === month);
+          return {
+            month, yt, dianne,
+            shorts: {
+              views: shortsSlice.reduce((s, w) => s + w.total_views, 0),
+              clips: shortsSlice.reduce((s, w) => s + w.clips, 0),
+              weeks: shortsSlice.length,
+            },
+            tdp: {
+              impressions: tdpSlice.reduce((s, w) => s + w.impressions, 0),
+              clicks: tdpSlice.reduce((s, w) => s + w.clicks, 0),
+              reactions: tdpSlice.reduce((s, w) => s + w.reactions, 0),
+              weeks: tdpSlice.length,
+            },
+            x: {
+              impressions: xSlice.reduce((s, w) => s + w.impressions, 0),
+              engagements: xSlice.reduce((s, w) => s + w.engagements, 0),
+              follows: xSlice.reduce((s, w) => s + w.follows - w.unfollows, 0),
+              weeks: xSlice.length,
+            },
+          };
+        });
+
+        const pct = (curr: number, prev: number) => prev > 0 ? Math.round(((curr - prev) / prev) * 1000) / 10 : null;
+
+        return (
+          <div>
+            <SectionHeader title="Monthly Growth" color="#117A65" badge={sortedMonths.length > 0 ? `${sortedMonths[0]} – ${sortedMonths[sortedMonths.length-1]}` : ""} />
+
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
+              <div className="overflow-x-auto">
+                <table className="w-full text-[13px]">
+                  <thead>
+                    <tr className="bg-gray-50">
+                      <th className="sticky left-0 bg-gray-50 text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Month</th>
+                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider font-semibold" style={{ color: "#C0392B" }}>YT Views</th>
+                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500">MoM</th>
+                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider font-semibold" style={{ color: "#E67E22" }}>Shorts Views</th>
+                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500">MoM</th>
+                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider font-semibold" style={{ color: "#0077B5" }}>LI Dianne Imp</th>
+                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500">MoM</th>
+                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider font-semibold" style={{ color: "#1A5276" }}>TDP Page Imp</th>
+                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500">MoM</th>
+                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider font-semibold" style={{ color: "#111111" }}>X Eng</th>
+                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500">MoM</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rollups.map((r, i) => {
+                      const prev = i > 0 ? rollups[i - 1] : null;
+                      return (
+                        <tr key={r.month} className={r.yt?.partial ? "bg-[#e8f8f5]" : ""}>
+                          <td className="sticky left-0 bg-inherit px-3.5 py-2.5 font-semibold">
+                            {r.month}
+                            {r.yt?.partial && <span className="inline-block bg-[#2E86AB] text-white px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ml-1.5">Partial</span>}
+                          </td>
+                          <td className="px-3.5 py-2.5 font-mono text-xs">{r.yt ? fmt(r.yt.views) : "—"}</td>
+                          <td className="px-3.5 py-2.5"><Trend value={r.yt?.mom_pct ?? null} /></td>
+                          <td className="px-3.5 py-2.5 font-mono text-xs">{r.shorts.weeks > 0 ? fmt(r.shorts.views) : "—"}</td>
+                          <td className="px-3.5 py-2.5"><Trend value={prev && prev.shorts.weeks > 0 && r.shorts.weeks > 0 ? pct(r.shorts.views, prev.shorts.views) : null} /></td>
+                          <td className="px-3.5 py-2.5 font-mono text-xs">{r.dianne ? fmt(r.dianne.impressions) : "—"}</td>
+                          <td className="px-3.5 py-2.5"><Trend value={r.dianne?.mom_imp ?? null} /></td>
+                          <td className="px-3.5 py-2.5 font-mono text-xs">{r.tdp.weeks > 0 ? fmt(r.tdp.impressions) : "—"}</td>
+                          <td className="px-3.5 py-2.5"><Trend value={prev && prev.tdp.weeks > 0 && r.tdp.weeks > 0 ? pct(r.tdp.impressions, prev.tdp.impressions) : null} /></td>
+                          <td className="px-3.5 py-2.5 font-mono text-xs">{r.x.weeks > 0 ? fmt(r.x.engagements) : "—"}</td>
+                          <td className="px-3.5 py-2.5"><Trend value={prev && prev.x.weeks > 0 && r.x.weeks > 0 ? pct(r.x.engagements, prev.x.engagements) : null} /></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Per-month cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+              {rollups.slice(-6).map((r) => (
+                <div key={r.month} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                  <div className="px-4 py-3 bg-[#117A65] text-white text-[13px] font-bold flex items-center justify-between">
+                    <span>{r.month}</span>
+                    {r.yt?.partial && <span className="text-[9px] bg-white/20 px-1.5 py-0.5 rounded uppercase">Partial</span>}
                   </div>
-                  <div className="p-4">
-                    <div className="mb-4 pb-3.5 border-b border-gray-200">
-                      <div className="text-[10px] font-semibold uppercase tracking-wider text-[#C0392B] mb-1">YouTube</div>
-                      <div className="font-mono text-lg font-bold">{fmt(yt.views)}</div>
-                      <div className="text-[11px] text-gray-500">Daily avg: {fmt(yt.daily_avg)}</div>
-                      {yt.mom_pct && <div className="mt-1"><Trend value={yt.mom_pct} /></div>}
-                      {yt.projected && <div className="text-[11px] text-gray-500 mt-1">Proj: ~{fmt(yt.projected)}</div>}
-                    </div>
-                    <div className="mb-4 pb-3.5 border-b border-gray-200">
-                      <div className="text-[10px] font-semibold uppercase tracking-wider text-[#0077B5] mb-1">LinkedIn Dianne</div>
-                      <div className="font-mono text-lg font-bold">{fmt(li?.impressions || 0)}</div>
-                      <div className="text-[11px] text-gray-500">Saves: {fmt(li?.saves || 0)} &middot; {li?.posts || 0} posts</div>
-                      {li?.mom_imp && <div className="mt-1"><Trend value={li.mom_imp} /></div>}
-                    </div>
-                    <div>
-                      <div className="text-[10px] font-semibold uppercase tracking-wider text-[#0077B5] mb-1">Saves MoM</div>
-                      <div className="font-mono text-lg font-bold">{fmt(li?.saves || 0)}</div>
-                      {li?.mom_saves && <div className="mt-1"><Trend value={li.mom_saves} /></div>}
-                    </div>
+                  <div className="p-4 space-y-3">
+                    {[
+                      { k: "YouTube", color: "#C0392B", val: r.yt ? fmt(r.yt.views) + " views" : "—", sub: r.yt ? `${fmt(r.yt.daily_avg)}/day` : "", mom: r.yt?.mom_pct ?? null },
+                      { k: "Shorts", color: "#E67E22", val: r.shorts.weeks > 0 ? fmt(r.shorts.views) + " views" : "—", sub: r.shorts.weeks > 0 ? `${r.shorts.clips} clips` : "" },
+                      { k: "LI Dianne", color: "#0077B5", val: r.dianne ? fmt(r.dianne.impressions) + " imp" : "—", sub: r.dianne ? `${r.dianne.saves} saves · ${r.dianne.posts} posts` : "", mom: r.dianne?.mom_imp ?? null },
+                      { k: "TDP Page", color: "#1A5276", val: r.tdp.weeks > 0 ? fmt(r.tdp.impressions) + " imp" : "—", sub: r.tdp.weeks > 0 ? `${fmt(r.tdp.clicks)} clicks` : "" },
+                      { k: "X", color: "#111111", val: r.x.weeks > 0 ? fmt(r.x.engagements) + " eng" : "—", sub: r.x.weeks > 0 ? `${fmt(r.x.impressions)} imp · +${r.x.follows} foll.` : "" },
+                    ].map((row) => (
+                      <div key={row.k} className="flex items-start justify-between text-[12px]">
+                        <div>
+                          <div className="text-[10px] font-semibold uppercase tracking-wider mb-0.5" style={{ color: row.color }}>{row.k}</div>
+                          <div className="font-mono text-[13px] font-bold">{row.val}</div>
+                          {row.sub && <div className="text-[10px] text-gray-500">{row.sub}</div>}
+                        </div>
+                        {"mom" in row && row.mom !== null && row.mom !== undefined && (
+                          <Trend value={row.mom} />
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
-              );
-            })}
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
