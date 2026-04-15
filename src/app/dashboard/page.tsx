@@ -875,6 +875,17 @@ function DashboardContent() {
           const ytTotalViews = (yt?.views ?? 0) + shortsViews;
           const ytDays = yt?.days ?? 0;
           const ytCombinedDaily = ytDays > 0 ? Math.round(ytTotalViews / ytDays) : null;
+
+          // Combined LinkedIn: Dianne posts + TDP Page
+          const diImp = dianne?.impressions ?? 0;
+          const liCombinedImp = diImp + tdpImp;
+          const diSaves = dianne?.saves ?? 0;
+          const diReactions = 0; // not stored at monthly level for Dianne; placeholder
+          const liCombinedEng = diSaves + tdpImp > 0 ? diSaves + tdpClicks : 0;
+
+          // All channels: total reach (views + impressions)
+          const allReach = ytTotalViews + diImp + tdpImp + xImp;
+
           return {
             month, yt, dianne,
             isPartial: yt?.partial === 1,
@@ -882,6 +893,7 @@ function DashboardContent() {
             hasTDP: tdpSlice.length > 0,
             hasX: xSlice.length > 0,
             metrics: {
+              all_total_reach: allReach > 0 ? allReach : null,
               yt_combined_daily: ytCombinedDaily,
               yt_combined_total: ytTotalViews > 0 ? ytTotalViews : null,
               yt_daily_avg: yt?.daily_avg ?? null,
@@ -889,6 +901,8 @@ function DashboardContent() {
               shorts_avg_per_clip: shortsClips > 0 ? Math.round(shortsViews / shortsClips) : null,
               shorts_total_views: shortsSlice.length > 0 ? shortsViews : null,
               shorts_clips: shortsSlice.length > 0 ? shortsClips : null,
+              li_combined_imp: liCombinedImp > 0 ? liCombinedImp : null,
+              li_combined_clicks_saves: (tdpClicks + diSaves) > 0 ? tdpClicks + diSaves : null,
               dianne_imp_per_post: dianne && dianne.posts > 0 ? Math.round(dianne.impressions / dianne.posts) : null,
               dianne_saves_per_post: dianne && dianne.posts > 0 ? Math.round(dianne.saves / dianne.posts) : null,
               dianne_posts: dianne?.posts ?? null,
@@ -909,6 +923,12 @@ function DashboardContent() {
         };
         type ChannelGroup = { channel: string; color: string; metrics: MetricDef[] };
         const groups: ChannelGroup[] = [
+          {
+            channel: "All Channels — Total Reach", color: "#2E86AB",
+            metrics: [
+              { label: "Total Reach (views + imp)", key: "all_total_reach", unit: "reach", kind: "count" },
+            ],
+          },
           {
             channel: "YouTube (long-form + shorts)", color: "#922B21",
             metrics: [
@@ -932,7 +952,14 @@ function DashboardContent() {
             ],
           },
           {
-            channel: "LinkedIn: Dianne", color: "#0077B5",
+            channel: "LinkedIn (Dianne + TDP Page)", color: "#154360",
+            metrics: [
+              { label: "Total Impressions (combined)", key: "li_combined_imp", unit: "imp", kind: "count" },
+              { label: "Clicks + Saves (combined)", key: "li_combined_clicks_saves", unit: "", kind: "count" },
+            ],
+          },
+          {
+            channel: "↳ LinkedIn: Dianne", color: "#0077B5",
             metrics: [
               { label: "Impressions/Post", key: "dianne_imp_per_post", unit: "/post", kind: "ratio" },
               { label: "Saves/Post", key: "dianne_saves_per_post", unit: "/post", kind: "ratio" },
@@ -940,7 +967,7 @@ function DashboardContent() {
             ],
           },
           {
-            channel: "LinkedIn: TDP Page", color: "#1A5276",
+            channel: "↳ LinkedIn: TDP Page", color: "#1A5276",
             metrics: [
               { label: "Impressions/Week", key: "tdp_imp_per_week", unit: "/wk", kind: "ratio" },
               { label: "CTR", key: "tdp_ctr", unit: "%", kind: "pct" },
