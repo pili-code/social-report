@@ -155,17 +155,37 @@ function DashboardContent() {
 
   if (!rawData) return <div className="flex items-center justify-center h-96 text-gray-400">Loading...</div>;
 
-  // Apply range filter to time-series tables
+  // Chronological sort helpers
+  const sortByWeek = <T extends { week: string }>(arr: T[]): T[] =>
+    [...arr].sort((a, b) => {
+      const da = parseWeekStart(a.week)?.getTime() ?? 0;
+      const db = parseWeekStart(b.week)?.getTime() ?? 0;
+      return da - db;
+    });
+  const sortByMonth = <T extends { month: string }>(arr: T[]): T[] =>
+    [...arr].sort((a, b) => {
+      const da = parseMonth(a.month)?.getTime() ?? 0;
+      const db = parseMonth(b.month)?.getTime() ?? 0;
+      return da - db;
+    });
+  const sortByDate = <T extends Record<string, unknown>>(arr: T[], key: string): T[] =>
+    [...arr].sort((a, b) => {
+      const va = a[key] ? new Date(a[key] as string).getTime() : 0;
+      const vb = b[key] ? new Date(b[key] as string).getTime() : 0;
+      return (isNaN(va) ? 0 : va) - (isNaN(vb) ? 0 : vb);
+    });
+
+  // Apply range filter + chronological sort to time-series tables
   const data: DataSet = {
     ...rawData,
-    youtube_weekly: filterByWeek(rawData.youtube_weekly, range),
-    youtube_monthly: filterByMonth(rawData.youtube_monthly, range),
-    youtube_videos: filterByDate(rawData.youtube_videos, range, "published"),
-    shorts_weekly: filterByWeek(rawData.shorts_weekly, range),
-    linkedin_dianne_posts: filterByDate(rawData.linkedin_dianne_posts, range, "date"),
-    linkedin_dianne_monthly: filterByMonth(rawData.linkedin_dianne_monthly, range),
-    linkedin_tdp_weekly: filterByWeek(rawData.linkedin_tdp_weekly, range),
-    twitter_weekly: rawData.twitter_weekly ? filterByWeek(rawData.twitter_weekly, range) : [],
+    youtube_weekly: sortByWeek(filterByWeek(rawData.youtube_weekly, range)),
+    youtube_monthly: sortByMonth(filterByMonth(rawData.youtube_monthly, range)),
+    youtube_videos: sortByDate(filterByDate(rawData.youtube_videos, range, "published"), "published"),
+    shorts_weekly: sortByWeek(filterByWeek(rawData.shorts_weekly, range)),
+    linkedin_dianne_posts: sortByDate(filterByDate(rawData.linkedin_dianne_posts, range, "date"), "date"),
+    linkedin_dianne_monthly: sortByMonth(filterByMonth(rawData.linkedin_dianne_monthly, range)),
+    linkedin_tdp_weekly: sortByWeek(filterByWeek(rawData.linkedin_tdp_weekly, range)),
+    twitter_weekly: rawData.twitter_weekly ? sortByWeek(filterByWeek(rawData.twitter_weekly, range)) : [],
   };
 
   const ytMonthly = data.youtube_monthly;
