@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState, Component, Fragment, type ReactNode } from "react";
 import { useSearchParams } from "next/navigation";
 import { YTWeeklyChart, YTMonthlySparkline, ShortsChart, DianneChart } from "@/components/Charts";
+import { YouTubeDrivers, DianneDrivers, TDPDrivers, XDrivers, ShortsDrivers } from "@/components/ContentDrivers";
 
 class ChartErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error: string }> {
   constructor(props: { children: ReactNode }) {
@@ -381,6 +382,8 @@ function DashboardContent() {
         <div>
           <SectionHeader title="YouTube" color="#C0392B" badge="Long-form" />
 
+          <YouTubeDrivers videos={data.youtube_videos} />
+
           {/* KPI Strip */}
           <div className="flex gap-6 mb-6 flex-wrap">
             {[
@@ -471,6 +474,7 @@ function DashboardContent() {
       {section === "shorts" && (
         <div>
           <SectionHeader title="Shorts" color="#E67E22" badge="Batch Performance" />
+          <ShortsDrivers weeks={data.shorts_weekly} />
 
           <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
             <div className="text-[13px] font-semibold mb-4 flex items-center gap-2">
@@ -522,6 +526,8 @@ function DashboardContent() {
       {section === "linkedin-dianne" && (
         <div>
           <SectionHeader title="LinkedIn: Dianne" color="#0077B5" badge="Personal Brand" />
+
+          <DianneDrivers posts={data.linkedin_dianne_posts} />
 
           {/* Top performers this month */}
           {dianneThisMonth.length > 0 && (
@@ -660,6 +666,8 @@ function DashboardContent() {
         <div>
           <SectionHeader title="LinkedIn: TDP Page" color="#1A5276" badge="Company Page" />
 
+          <TDPDrivers weeks={data.linkedin_tdp_weekly} />
+
           {/* Top weeks */}
           <div className="bg-white rounded-xl border border-gray-200 border-l-4 border-l-[#1A5276] p-5 mb-6">
             <h3 className="text-[11px] font-bold uppercase tracking-wider text-[#1A5276] mb-3">Top Weeks by Impressions</h3>
@@ -738,6 +746,7 @@ function DashboardContent() {
       {section === "twitter" && (
         <div>
           <SectionHeader title="X (Twitter)" color="#111111" badge={`${data.twitter_weekly?.length || 0} weeks`} />
+          {data.twitter_weekly && data.twitter_weekly.length > 0 && <XDrivers weeks={data.twitter_weekly} />}
           {!data.twitter_weekly || data.twitter_weekly.length === 0 ? (
             <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">
               No X data yet. Upload <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs">account_overview_analytics.csv</code> to see weekly metrics.
