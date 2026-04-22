@@ -16,14 +16,16 @@ const { data: weekly } = await sb.from("youtube_weekly").select("*");
 const { data: existing } = await sb.from("youtube_monthly").select("*");
 const priorBy = new Map(existing.map((r) => [r.month, r]));
 
-// Parse week string like "Dec 28–Jan 3" → start/end dates
+// Parse week string like "Dec 28–Jan 3" or "Dec 28–Jan 3, 2025" → start/end dates
 function parseWeekRange(week, monthHint) {
-  const clean = week.trim();
+  const raw = week.trim();
+  const yearMatch = raw.match(/,\s*(\d{4})\s*$/);
+  const clean = yearMatch ? raw.slice(0, -yearMatch[0].length).trim() : raw;
   const parts = clean.split("–").map((s) => s.trim());
   if (parts.length !== 2) return null;
   const [leftStr, rightStr] = parts;
   const [hintName, hintYear] = (monthHint || "").split(" ");
-  const year = parseInt(hintYear) || new Date().getFullYear();
+  const year = yearMatch ? parseInt(yearMatch[1]) : (parseInt(hintYear) || new Date().getFullYear());
 
   const leftMatch = leftStr.match(/^(\w{3})\s+(\d+)$/);
   const rightMatch = rightStr.match(/^(\w{3})\s+(\d+)$/);

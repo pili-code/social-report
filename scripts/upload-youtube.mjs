@@ -13,8 +13,10 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
   auth: { persistSession: false },
 });
 
-const DIR = "/Users/pilitdp/Downloads/Content 2026-01-15_2026-04-15 The Design Project";
+const DIR = "/Users/pilitdp/Downloads/Content 2022-04-27_2026-04-22 The Design Project";
 const SHORTS_MAX = 180;
+// Cutoff: only keep weeks whose START is on or after this date (and videos published >= this date).
+const START_CUTOFF = new Date(Date.UTC(2025, 9, 1)); // 2025-10-01
 
 function readCsv(file) {
   const raw = fs.readFileSync(path.join(DIR, file), "utf8");
@@ -24,6 +26,8 @@ function readCsv(file) {
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const fmtDay = (d) => `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
 const fmtMonth = (d) => `${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+// Week label includes year of the week-start date to distinguish across years.
+const fmtWeek = (start, end) => `${fmtDay(start)}–${fmtDay(end)}, ${start.getUTCFullYear()}`;
 function startOfWeek(d) {
   const o = new Date(d);
   o.setUTCDate(o.getUTCDate() - o.getUTCDay());
@@ -51,8 +55,10 @@ const ytBuckets = new Map();
 for (const r of totals) {
   const d = new Date(r.Date);
   if (isNaN(d.getTime())) continue;
-  const key = startOfWeek(d).toISOString().slice(0, 10);
-  const b = ytBuckets.get(key) ?? { dates: [], views: 0 };
+  const weekStart = startOfWeek(d);
+  if (weekStart < START_CUTOFF) continue;
+  const key = weekStart.toISOString().slice(0, 10);
+  const b = ytBuckets.get(key) ?? { dates: [], views: 0, start: weekStart };
   b.dates.push(d);
   b.views += Number(r.Views) || 0;
   ytBuckets.set(key, b);
@@ -60,18 +66,26 @@ for (const r of totals) {
 const ytWeekly = [...ytBuckets.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([, b]) => {
   b.dates.sort((a, b) => a - b);
   return {
-    week: `${fmtDay(b.dates[0])}–${fmtDay(b.dates.at(-1))}`,
-    month: fmtMonth(b.dates[0]),
+    week: fmtWeek(b.dates[0], b.dates.at(-1)),
+    month: fmtMonth(b.start),
     views: Math.round(b.views),
     days: b.dates.length,
   };
 });
-console.log(`youtube_weekly: upserting ${ytWeekly.length} weeks (Totals.csv)`);
+console.log(`youtube_weekly: upserting ${ytWeekly.length} weeks (Totals.csv, >= ${START_CUTOFF.toISOString().slice(0,10)})`);
 const ytWeeklyInserted = await upsert("youtube_weekly", ytWeekly, "week");
 console.log(`  → ${ytWeeklyInserted} rows upserted`);
 
 // ---- 2. Table data.csv → split by Duration → youtube_videos + shorts_weekly ----
-const table = readCsv("Table data.csv").filter((r) => r.Content && r.Content !== "Total");
+// Filter to videos published on/after START_CUTOFF.
+const table = readCsv("Table data.csv").filter((r) => {
+  if (!r.Content || r.Content === "Total") return false;
+  const pub = r["Video publish time"];
+  if (!pub) return false;
+  const d = new Date(pub);
+  if (isNaN(d.getTime())) return false;
+  return d >= START_CUTOFF;
+});
 
 const longForm = [];
 const shorts = [];
@@ -92,19 +106,21 @@ const ytVideos = longForm
     subs: Math.round(Number(r.Subscribers) || 0),
     note: "",
   }));
-console.log(`youtube_videos: upserting ${ytVideos.length} videos (Table data.csv long-form)`);
+console.log(`youtube_videos: upserting ${ytVideos.length} videos (Table data.csv long-form, >= ${START_CUTOFF.toISOString().slice(0,10)})`);
 const ytVideosInserted = await upsert("youtube_videos", ytVideos, "title");
 console.log(`  → ${ytVideosInserted} rows upserted`);
 
-// Aggregate shorts by publish week
+// Aggregate shorts by publish week (week of publish date).
 const shortBuckets = new Map();
 for (const r of shorts) {
   const pub = r["Video publish time"];
   if (!pub) continue;
   const d = new Date(pub);
   if (isNaN(d.getTime())) continue;
-  const key = startOfWeek(d).toISOString().slice(0, 10);
-  const b = shortBuckets.get(key) ?? { dates: [], views: 0, impressions: 0, clips: new Set() };
+  const weekStart = startOfWeek(d);
+  if (weekStart < START_CUTOFF) continue;
+  const key = weekStart.toISOString().slice(0, 10);
+  const b = shortBuckets.get(key) ?? { dates: [], views: 0, impressions: 0, clips: new Set(), start: weekStart };
   b.dates.push(d);
   b.views += Number(r.Views) || 0;
   b.impressions += Number(r.Impressions) || 0;
@@ -114,8 +130,10 @@ for (const r of shorts) {
 const shortsRows = [...shortBuckets.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([, b]) => {
   b.dates.sort((a, b) => a - b);
   const clips = b.clips.size;
+  const end = new Date(b.start);
+  end.setUTCDate(end.getUTCDate() + 6);
   return {
-    week: `${fmtDay(b.dates[0])}–${fmtDay(b.dates.at(-1))}`,
+    week: fmtWeek(b.start, end),
     clips,
     total_views: Math.round(b.views),
     avg_per_clip: clips > 0 ? Math.round(b.views / clips) : 0,

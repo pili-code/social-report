@@ -66,16 +66,22 @@ type TimeRange = "4w" | "3m" | "6m" | "all";
 const RANGE_LABELS: Record<TimeRange, string> = { "4w": "Last 4 weeks", "3m": "Last 3 months", "6m": "Last 6 months", all: "All time" };
 
 function parseWeekStart(week: string): Date | null {
-  // "Mar 29–Apr 4" — take the left side; assume current-ish year
-  const left = week.split("–")[0].trim();
+  // "Oct 5–Oct 11, 2025" (preferred) or legacy "Mar 29–Apr 4" without year
+  const yearMatch = week.match(/,\s*(\d{4})\s*$/);
+  const clean = yearMatch ? week.slice(0, -yearMatch[0].length) : week;
+  const left = clean.split("–")[0].trim();
   const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
   const m = left.match(/^(\w{3})\s+(\d+)$/);
   if (!m) return null;
   const mi = MONTHS.indexOf(m[1]);
   if (mi < 0) return null;
-  const now = new Date();
-  // If month is greater than current month, assume previous year (wraparound)
-  const year = mi > now.getUTCMonth() ? now.getUTCFullYear() - 1 : now.getUTCFullYear();
+  let year: number;
+  if (yearMatch) {
+    year = parseInt(yearMatch[1]);
+  } else {
+    const now = new Date();
+    year = mi > now.getUTCMonth() ? now.getUTCFullYear() - 1 : now.getUTCFullYear();
+  }
   return new Date(Date.UTC(year, mi, parseInt(m[2])));
 }
 function parseMonth(month: string): Date | null {
@@ -204,8 +210,10 @@ function DashboardContent() {
   // Best performers in the CURRENT month (from latest youtube_monthly.month if valid)
   const currentMonth = latestYTMonthly?.month ?? "Apr 2026";
   const monthMatch = (w: string) => {
-    // week strings like "Apr 5–Apr 11" — match by leading month token
+    // week strings like "Apr 5–Apr 11, 2026" — match by month token AND year
     const [name, year] = currentMonth.split(" ");
+    const wYearMatch = w.match(/,\s*(\d{4})\s*$/);
+    if (wYearMatch && wYearMatch[1] !== year) return false;
     return w.startsWith(name) || w.includes(`–${name}`);
   };
   const dateInMonth = (dateStr: string) => {

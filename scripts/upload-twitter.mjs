@@ -13,35 +13,43 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
   auth: { persistSession: false },
 });
 
+const CSV_FILE = "/Users/pilitdp/Downloads/account_overview_analytics (2).csv";
+const START_CUTOFF = new Date(Date.UTC(2025, 9, 1)); // 2025-10-01
+
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 const fmtDay = (d) => `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
+const fmtWeek = (start, end) => `${fmtDay(start)}–${fmtDay(end)}, ${start.getUTCFullYear()}`;
 function startOfWeek(d) {
   const o = new Date(d);
   o.setUTCDate(o.getUTCDate() - o.getUTCDay());
   o.setUTCHours(0, 0, 0, 0);
   return o;
 }
-function weekLabel(d) {
-  const s = startOfWeek(d);
-  const e = new Date(s);
-  e.setUTCDate(e.getUTCDate() + 6);
-  return `${fmtDay(s)}–${fmtDay(e)}`;
-}
 const toNum = (v) => Number(String(v ?? "").replace(/,/g, "")) || 0;
 
-const raw = fs.readFileSync("/Users/pilitdp/Downloads/account_overview_analytics.csv", "utf8");
+// Wipe existing (year-less labels replaced by year-labeled format).
+{
+  const { error, count } = await supabase.from("twitter_weekly").delete({ count: "exact" }).neq("id", -1);
+  if (error) { console.error(`cleanup failed: ${error.message}`); process.exit(1); }
+  console.log(`twitter_weekly: deleted ${count ?? "?"} existing rows`);
+}
+
+const raw = fs.readFileSync(CSV_FILE, "utf8");
 const rows = parse(raw, { columns: true, skip_empty_lines: true });
 
-// Aggregate daily → weekly
+// Aggregate daily → weekly with Oct 1 2025 cutoff.
 const buckets = new Map();
 for (const r of rows) {
   const d = new Date(r.Date);
   if (isNaN(d.getTime())) continue;
-  const wk = weekLabel(d);
-  const b = buckets.get(wk) ?? {
+  const weekStart = startOfWeek(d);
+  if (weekStart < START_CUTOFF) continue;
+  const key = weekStart.toISOString().slice(0, 10);
+  const b = buckets.get(key) ?? {
     impressions: 0, likes: 0, engagements: 0, bookmarks: 0, shares: 0,
     follows: 0, unfollows: 0, replies: 0, reposts: 0,
     profile_visits: 0, video_views: 0,
+    start: weekStart, dates: [],
   };
   b.impressions += toNum(r.Impressions);
   b.likes += toNum(r.Likes);
@@ -54,20 +62,27 @@ for (const r of rows) {
   b.reposts += toNum(r.Reposts);
   b.profile_visits += toNum(r["Profile visits"]);
   b.video_views += toNum(r["Video views"]);
-  buckets.set(wk, b);
+  b.dates.push(d);
+  buckets.set(key, b);
 }
 
-const weekly = [...buckets.entries()].map(([week, b]) => ({
-  week, note: "", ...b,
-}));
+const weekly = [...buckets.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([, b]) => {
+  b.dates.sort((a, b) => a - b);
+  const { start, dates, ...metrics } = b;
+  return {
+    week: fmtWeek(b.dates[0], b.dates.at(-1)),
+    note: "",
+    ...metrics,
+  };
+});
 
-console.log(`twitter_weekly: ${weekly.length} weeks aggregated from ${rows.length} daily rows`);
+console.log(`\ntwitter_weekly: ${weekly.length} weeks aggregated (>= ${START_CUTOFF.toISOString().slice(0,10)}) from ${rows.length} daily rows`);
 weekly.forEach((r) => console.log(`  ${r.week}: imp=${r.impressions}, eng=${r.engagements}, follows=${r.follows - r.unfollows}`));
 
-const { error } = await supabase.from("twitter_weekly").upsert(weekly, { onConflict: "week" });
+const { error } = await supabase.from("twitter_weekly").insert(weekly);
 if (error) {
   console.error("FAILED:", error.message);
   console.error("Did you run the CREATE TABLE SQL in Supabase?");
   process.exit(1);
 }
-console.log(`\n${weekly.length} rows upserted.`);
+console.log(`\n${weekly.length} rows inserted.`);
