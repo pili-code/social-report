@@ -99,3 +99,21 @@ create table if not exists cold_email_campaigns (
   note text default '',
   created_at timestamptz default now()
 );
+
+create table if not exists workshop_signups (
+  id bigserial primary key,
+  submission_id text not null unique,
+  submitted_at timestamptz not null,
+  first_name text default '',
+  last_name text default '',
+  email text default '',
+  company text default '',
+  utm_source text default '',
+  utm_medium text default '',
+  utm_campaign text default '',
+  utm_content text default '',
+  notes text default '',
+  created_at timestamptz default now()
+);
+
+alter table youtube_videos add column if not exists utm_slug text default null;

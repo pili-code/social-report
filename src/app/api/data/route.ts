@@ -11,13 +11,20 @@ const TABLES = [
   "linkedin_tdp_weekly",
   "cold_email_campaigns",
   "twitter_weekly",
+  "workshop_signups",
 ];
 
 export async function GET() {
   const data: Record<string, unknown[]> = {};
   await Promise.all(
     TABLES.map(async (table) => {
-      data[table] = await getAllFromTable(table);
+      try {
+        data[table] = await getAllFromTable(table);
+      } catch (err) {
+        // Table may not exist yet (e.g. pending schema migration). Don't break the dashboard.
+        console.warn(`/api/data: ${table} unavailable —`, err instanceof Error ? err.message : err);
+        data[table] = [];
+      }
     })
   );
   return NextResponse.json(data);
