@@ -145,41 +145,68 @@ console.log(`shorts_weekly: upserting ${shortsRows.length} weeks (${shorts.lengt
 const shortsInserted = await upsert("shorts_weekly", shortsRows, "week");
 console.log(`  → ${shortsInserted} rows upserted`);
 
-// ---- 3. Rebuild youtube_monthly from updated youtube_weekly ----
-const { data: allWeekly } = await supabase.from("youtube_weekly").select("*");
+// ---- 3. Update youtube_monthly using DAILY → calendar-month aggregation ----
+// Weekly buckets are keyed by week-start month (label-friendly), but calendar-month
+// totals require splitting per-day so weeks crossing month boundaries don't inflate
+// the start-month and starve the next. Aggregate Totals.csv directly here.
+const monthByCalendar = new Map();
+for (const r of totals) {
+  const d = new Date(r.Date);
+  if (isNaN(d.getTime())) continue;
+  if (d < START_CUTOFF) continue;
+  const key = `${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  const b = monthByCalendar.get(key) ?? { views: 0, days: 0 };
+  b.views += Number(r.Views) || 0;
+  b.days += 1;
+  monthByCalendar.set(key, b);
+}
+
 const { data: existingMonthly } = await supabase.from("youtube_monthly").select("*");
 const existingByMonth = new Map(existingMonthly.map((r) => [r.month, r]));
-
-const monthBuckets = new Map();
-for (const w of allWeekly) {
-  const m = String(w.month ?? "").trim();
-  if (!m) continue;
-  const b = monthBuckets.get(m) ?? { views: 0, days: 0 };
-  b.views += Number(w.views) || 0;
-  b.days += Number(w.days) || 0;
-  monthBuckets.set(m, b);
-}
 function monthKey(m) {
   const [name, year] = m.split(" ");
   return parseInt(year) * 12 + MONTHS.indexOf(name);
 }
-const sortedMonths = [...monthBuckets.entries()].sort(([a], [b]) => monthKey(a) - monthKey(b));
-const monthlyRows = sortedMonths.map(([month, b], i) => {
-  const prev = i > 0 ? sortedMonths[i - 1][1] : null;
-  const momPct = prev && prev.views > 0 ? ((b.views - prev.views) / prev.views) * 100 : null;
+
+// Determine which months are FULLY covered by this export's daily data.
+// Months with fewer days than the calendar month are partial — only update the
+// current/latest one (if it's the in-flight month). Skip earlier partial months
+// so older accurate values from prior exports aren't overwritten.
+function daysInMonth(monthLabel) {
+  const [name, year] = monthLabel.split(" ");
+  return new Date(Date.UTC(parseInt(year), MONTHS.indexOf(name) + 1, 0)).getUTCDate();
+}
+const candidates = [...monthByCalendar.entries()].sort(([a], [b]) => monthKey(a) - monthKey(b));
+const latestMonth = candidates.length > 0 ? candidates[candidates.length - 1][0] : null;
+
+// Build a map of all months we'll write: existing rows + freshly aggregated ones.
+const merged = new Map(existingByMonth);
+for (const [month, b] of candidates) {
+  const isLatest = month === latestMonth;
+  const isFull = b.days >= daysInMonth(month);
+  if (!isFull && !isLatest) continue; // skip historical partial months
   const prior = existingByMonth.get(month) ?? {};
-  return {
+  merged.set(month, {
+    ...prior,
     month,
     views: b.views,
     days: b.days,
     daily_avg: b.days > 0 ? Math.round(b.views / b.days) : 0,
-    mom_pct: momPct !== null ? Math.round(momPct * 10) / 10 : null,
     note: prior.note ?? "",
-    partial: prior.partial ?? 0,
+    partial: isLatest && !isFull ? 1 : (prior.partial ?? 0),
     projected: prior.projected ?? null,
-  };
+  });
+}
+
+// Recompute MoM across the full chronological series.
+const sortedAll = [...merged.values()].sort((a, b) => monthKey(a.month) - monthKey(b.month));
+const monthlyRows = sortedAll.map((row, i) => {
+  const prev = i > 0 ? sortedAll[i - 1] : null;
+  const momPct = prev && prev.views > 0 ? ((row.views - prev.views) / prev.views) * 100 : null;
+  return { ...row, mom_pct: momPct !== null ? Math.round(momPct * 10) / 10 : null };
 });
-console.log(`youtube_monthly: rebuilding ${monthlyRows.length} months from weekly data`);
+
+console.log(`youtube_monthly: upserting ${monthlyRows.length} months (calendar-month aggregation from Totals.csv)`);
 const monthlyInserted = await upsert("youtube_monthly", monthlyRows, "month");
 console.log(`  → ${monthlyInserted} rows upserted`);
 
