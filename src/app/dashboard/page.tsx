@@ -24,14 +24,17 @@ class ChartErrorBoundary extends Component<{ children: ReactNode }, { hasError: 
 interface DataSet {
   youtube_weekly: Array<{ week: string; month: string; views: number; current: number }>;
   youtube_monthly: Array<{ month: string; views: number; days: number; daily_avg: number; mom_pct: number | null; note: string; partial: number; projected: number | null }>;
-  youtube_videos: Array<{ published: string; title: string; views: number; impressions: number; ctr: number; subs: number; note: string }>;
+  youtube_videos: Array<{ published: string; title: string; views: number; impressions: number; ctr: number; subs: number; note: string; utm_slug: string | null }>;
   shorts_weekly: Array<{ week: string; clips: number; total_views: number; avg_per_clip: number; impressions: number; note: string }>;
   linkedin_dianne_posts: Array<{ week: string; date: string; impressions: number; reactions: number; comments: number; saves: number; followers: number; note: string }>;
   linkedin_dianne_monthly: Array<{ month: string; impressions: number; saves: number; posts: number; mom_imp: number | null; mom_saves: number | null; partial: number; note: string }>;
   linkedin_tdp_weekly: Array<{ week: string; impressions: number; clicks: number; ctr: number; reactions: number; note: string }>;
   cold_email_campaigns: Array<{ campaign: string; status: string; window: string; sent: number; contacted: number; replies: number; reply_rate: number; interested: number; note: string }>;
   twitter_weekly: Array<{ week: string; impressions: number; likes: number; engagements: number; bookmarks: number; shares: number; follows: number; unfollows: number; replies: number; reposts: number; profile_visits: number; video_views: number; note: string }>;
+  workshop_signups: Array<{ submission_id: string; submitted_at: string; utm_source: string; utm_medium: string; utm_campaign: string; utm_content: string }>;
 }
+
+const UTM_TRACKING_START = new Date(Date.UTC(2026, 3, 22)); // 2026-04-22
 
 const fmt = (n: number) => n.toLocaleString();
 
@@ -448,33 +451,71 @@ function DashboardContent() {
           </div>
 
           {/* Video Log */}
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
-            <div className="px-4 py-3 text-[13px] font-semibold border-b border-gray-200">Video Log (90-day window)</div>
-            <table className="w-full text-[13px]">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Published</th>
-                  <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Title</th>
-                  <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Views</th>
-                  <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">CTR</th>
-                  <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Subs</th>
-                  <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Note</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...data.youtube_videos].sort((a, b) => b.views - a.views).map((v, i) => (
-                  <tr key={i} className={v.views > 10000 ? "bg-[#D5F5E3]" : ""}>
-                    <td className="px-3.5 py-2.5">{v.published}</td>
-                    <td className="px-3.5 py-2.5 max-w-[320px]">{v.title}</td>
-                    <td className="px-3.5 py-2.5 font-mono text-xs">{fmt(v.views)}</td>
-                    <td className="px-3.5 py-2.5 font-mono text-xs">{v.ctr}%</td>
-                    <td className="px-3.5 py-2.5 font-mono text-xs">{fmt(v.subs)}</td>
-                    <td className="px-3.5 py-2.5 text-[11px] text-gray-500 max-w-[200px]">{v.note}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {(() => {
+            const signupsBySlug = new Map<string, number>();
+            for (const s of data.workshop_signups ?? []) {
+              if (!s.utm_content) continue;
+              signupsBySlug.set(s.utm_content, (signupsBySlug.get(s.utm_content) ?? 0) + 1);
+            }
+            const trackingStartLabel = UTM_TRACKING_START.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+            return (
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
+                <div className="px-4 py-3 text-[13px] font-semibold border-b border-gray-200 flex items-center justify-between">
+                  <span>Video Log (90-day window)</span>
+                  <span className="text-[11px] font-normal text-gray-500">UTM tracking started {trackingStartLabel} — videos without a tag show — for Signups/Conv</span>
+                </div>
+                <table className="w-full text-[13px]">
+                  <thead>
+                    <tr className="bg-gray-50">
+                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Published</th>
+                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Title</th>
+                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Views</th>
+                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">CTR</th>
+                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Subs</th>
+                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Signups</th>
+                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Conv %</th>
+                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Note</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...data.youtube_videos].sort((a, b) => b.views - a.views).map((v, i) => {
+                      const tagged = !!v.utm_slug;
+                      const signups = tagged ? (signupsBySlug.get(v.utm_slug!) ?? 0) : null;
+                      const convPct = tagged && v.views > 0 && signups !== null ? (signups / v.views) * 100 : null;
+                      return (
+                        <tr key={i} className={v.views > 10000 ? "bg-[#D5F5E3]" : ""}>
+                          <td className="px-3.5 py-2.5">{v.published}</td>
+                          <td className="px-3.5 py-2.5 max-w-[320px]">{v.title}</td>
+                          <td className="px-3.5 py-2.5 font-mono text-xs">{fmt(v.views)}</td>
+                          <td className="px-3.5 py-2.5 font-mono text-xs">{v.ctr}%</td>
+                          <td className="px-3.5 py-2.5 font-mono text-xs">{fmt(v.subs)}</td>
+                          <td className="px-3.5 py-2.5 font-mono text-xs">
+                            {tagged ? (
+                              <span className={signups! > 0 ? "inline-block px-1.5 py-0.5 rounded text-[11px] font-semibold bg-[#D5F5E3] text-[#1E8449]" : ""}>{signups}</span>
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
+                          </td>
+                          <td className="px-3.5 py-2.5 font-mono text-xs">
+                            {convPct !== null ? (
+                              convPct >= 0.05 ? (
+                                <span className="inline-block px-1.5 py-0.5 rounded text-[11px] font-semibold bg-[#D5F5E3] text-[#1E8449]">{convPct.toFixed(3)}%</span>
+                              ) : (
+                                <span>{convPct.toFixed(3)}%</span>
+                              )
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
+                          </td>
+                          <td className="px-3.5 py-2.5 text-[11px] text-gray-500 max-w-[200px]">{v.note}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            );
+          })()}
         </div>
       )}
 
