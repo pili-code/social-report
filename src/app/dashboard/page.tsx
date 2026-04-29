@@ -454,8 +454,9 @@ function DashboardContent() {
           {(() => {
             const signupsBySlug = new Map<string, number>();
             for (const s of data.workshop_signups ?? []) {
-              if (!s.utm_content) continue;
-              signupsBySlug.set(s.utm_content, (signupsBySlug.get(s.utm_content) ?? 0) + 1);
+              const slug = s.utm_campaign || s.utm_content;
+              if (!slug) continue;
+              signupsBySlug.set(slug, (signupsBySlug.get(slug) ?? 0) + 1);
             }
             const trackingStartLabel = UTM_TRACKING_START.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
             return (
