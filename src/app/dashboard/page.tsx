@@ -157,7 +157,7 @@ function DashboardContent() {
   const [rawData, setRawData] = useState<DataSet | null>(null);
   const [range, setRange] = useState<TimeRange>("6m");
   const searchParams = useSearchParams();
-  const section = searchParams.get("tab") || "overview";
+  const section = searchParams.get("tab") || "youtube";
 
   useEffect(() => {
     fetch("/api/data").then(r => r.json()).then(setRawData);
@@ -201,24 +201,7 @@ function DashboardContent() {
   const ytMonthly = data.youtube_monthly;
   const latestYTMonthly = ytMonthly[ytMonthly.length - 1];
   const marYT = ytMonthly.find(m => m.month === "Mar 2026") ?? latestYTMonthly;
-  const bestDiannePost = [...data.linkedin_dianne_posts].sort((a, b) => b.saves - a.saves)[0];
-  const bestEmailRate = [...data.cold_email_campaigns].sort((a, b) => b.reply_rate - a.reply_rate)[0];
-  const totalClips = data.shorts_weekly.reduce((s, w) => s + w.clips, 0);
-  const currentYTWeek = data.youtube_weekly[data.youtube_weekly.length - 1];
-  const currentShorts = data.shorts_weekly[data.shorts_weekly.length - 1];
-  const currentDianne = data.linkedin_dianne_posts[data.linkedin_dianne_posts.length - 1];
-  const currentTDP = data.linkedin_tdp_weekly[data.linkedin_tdp_weekly.length - 1];
-  const currentX = data.twitter_weekly?.[data.twitter_weekly.length - 1];
-
-  // Best performers in the CURRENT month (from latest youtube_monthly.month if valid)
   const currentMonth = latestYTMonthly?.month ?? "Apr 2026";
-  const monthMatch = (w: string) => {
-    // week strings like "Apr 5–Apr 11, 2026" — match by month token AND year
-    const [name, year] = currentMonth.split(" ");
-    const wYearMatch = w.match(/,\s*(\d{4})\s*$/);
-    if (wYearMatch && wYearMatch[1] !== year) return false;
-    return w.startsWith(name) || w.includes(`–${name}`);
-  };
   const dateInMonth = (dateStr: string) => {
     const d = new Date(dateStr);
     if (isNaN(d.getTime())) return false;
@@ -226,167 +209,11 @@ function DashboardContent() {
     const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     return d.getUTCMonth() === MONTHS.indexOf(name) && d.getUTCFullYear() === parseInt(year);
   };
-
-  const ytVideosThisMonth = data.youtube_videos.filter((v) => v.published && dateInMonth(v.published));
-  const bestYTVideoThisMonth = ytVideosThisMonth.sort((a, b) => b.views - a.views)[0];
-  const shortsThisMonth = data.shorts_weekly.filter((w) => monthMatch(w.week));
-  const bestShortsWeek = shortsThisMonth.sort((a, b) => b.total_views - a.total_views)[0];
   const dianneThisMonth = data.linkedin_dianne_posts.filter((p) => dateInMonth(p.date));
-  const bestDianneThisMonth = dianneThisMonth.sort((a, b) => b.impressions - a.impressions)[0];
-  const tdpThisMonth = data.linkedin_tdp_weekly.filter((w) => monthMatch(w.week));
-  const bestTDPWeek = tdpThisMonth.sort((a, b) => b.impressions - a.impressions)[0];
-  const xThisMonth = data.twitter_weekly?.filter((w) => monthMatch(w.week)) ?? [];
-  const bestXWeek = xThisMonth.sort((a, b) => b.engagements - a.engagements)[0];
 
   return (
     <div>
       <FilterBar range={range} onChange={setRange} />
-
-      {/* ===== OVERVIEW ===== */}
-      {section === "overview" && (
-        <div>
-          <SectionHeader title="Overview" color="#2E86AB" badge={currentMonth} />
-
-          {/* This week callout */}
-          <div className="bg-white rounded-xl border border-gray-200 border-l-4 border-l-[#117A65] p-5 mb-6">
-            <h3 className="text-[13px] font-bold text-[#117A65] uppercase tracking-wider mb-3">
-              This Week &mdash; {currentYTWeek?.week} <span className="inline-block bg-[#2E86AB] text-white px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ml-2">Partial</span>
-            </h3>
-            <div className="flex gap-7 flex-wrap">
-              {[
-                { label: "YT Long-form", val: fmt(currentYTWeek?.views || 0) },
-                { label: "Shorts", val: fmt(currentShorts?.total_views || 0) },
-                { label: "LI Dianne Imp.", val: fmt(currentDianne?.impressions || 0) },
-                { label: "TDP Page Imp.", val: fmt(currentTDP?.impressions || 0) },
-                { label: "X Impressions", val: fmt(currentX?.impressions || 0) },
-              ].map((s, i) => (
-                <div key={i}>
-                  <div className="text-[10px] text-gray-500 uppercase tracking-wider font-semibold">{s.label}</div>
-                  <div className="font-mono text-xl font-bold mt-0.5">{s.val}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Best of the Month per Channel */}
-          <div className="mb-2 flex items-center gap-2">
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-500">Best of {currentMonth}</h3>
-            <div className="flex-1 border-t border-gray-200" />
-          </div>
-          <div className="grid grid-cols-3 gap-4 mb-7">
-            {[
-              {
-                label: "YouTube", color: "#C0392B",
-                has: !!bestYTVideoThisMonth,
-                metric: bestYTVideoThisMonth ? fmt(bestYTVideoThisMonth.views) + " views" : "No new video",
-                title: bestYTVideoThisMonth?.title ?? "—",
-                sub: bestYTVideoThisMonth ? `CTR ${bestYTVideoThisMonth.ctr}% · +${fmt(bestYTVideoThisMonth.subs)} subs` : "",
-              },
-              {
-                label: "Shorts", color: "#E67E22",
-                has: !!bestShortsWeek,
-                metric: bestShortsWeek ? fmt(bestShortsWeek.total_views) + " views" : "No shorts",
-                title: bestShortsWeek ? `${bestShortsWeek.clips} clips · ${bestShortsWeek.week}` : "—",
-                sub: bestShortsWeek ? `${fmt(bestShortsWeek.avg_per_clip)} avg/clip` : "",
-              },
-              {
-                label: "LinkedIn: Dianne", color: "#0077B5",
-                has: !!bestDianneThisMonth,
-                metric: bestDianneThisMonth ? fmt(bestDianneThisMonth.impressions) + " imp" : "No post",
-                title: bestDianneThisMonth ? `${bestDianneThisMonth.date} · ${bestDianneThisMonth.reactions} reactions` : "—",
-                sub: bestDianneThisMonth ? `${bestDianneThisMonth.saves} saves · ${bestDianneThisMonth.comments} comments · +${bestDianneThisMonth.followers} followers` : "",
-              },
-              {
-                label: "LinkedIn: TDP Page", color: "#1A5276",
-                has: !!bestTDPWeek,
-                metric: bestTDPWeek ? fmt(bestTDPWeek.impressions) + " imp" : "No data",
-                title: bestTDPWeek?.week ?? "—",
-                sub: bestTDPWeek ? `${fmt(bestTDPWeek.clicks)} clicks · ${bestTDPWeek.ctr}% CTR · ${bestTDPWeek.note || "(no note)"}` : "",
-              },
-              {
-                label: "X (Twitter)", color: "#111111",
-                has: !!bestXWeek,
-                metric: bestXWeek ? fmt(bestXWeek.engagements) + " engagements" : "No data",
-                title: bestXWeek?.week ?? "—",
-                sub: bestXWeek ? `${fmt(bestXWeek.impressions)} imp · +${bestXWeek.follows - bestXWeek.unfollows} net follows` : "",
-              },
-              {
-                label: "Cold Email", color: "#6C3483",
-                has: !!bestEmailRate,
-                metric: bestEmailRate ? `${bestEmailRate.reply_rate}% reply` : "No data",
-                title: bestEmailRate?.campaign?.split(" - ")[0] ?? "—",
-                sub: bestEmailRate ? `${fmt(bestEmailRate.sent)} sent · ${bestEmailRate.interested} interested` : "",
-              },
-            ].map((c, i) => (
-              <div key={i} className="bg-white rounded-xl p-5 border border-gray-200 relative overflow-hidden">
-                <div className="absolute top-0 left-0 right-0 h-[3px]" style={{ background: c.color }} />
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: c.color }}>{c.label}</span>
-                  {!c.has && <span className="text-[10px] text-gray-400">no data this month</span>}
-                </div>
-                <div className="font-mono text-xl font-bold mb-1">{c.metric}</div>
-                <div className="text-[12px] text-gray-700 font-medium leading-snug mb-1 line-clamp-2">{c.title}</div>
-                {c.sub && <div className="text-[11px] text-gray-500">{c.sub}</div>}
-              </div>
-            ))}
-          </div>
-
-          {/* Sparkline */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
-            <div className="text-[13px] font-semibold mb-4 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-[#C0392B] inline-block" /> YouTube Monthly Views (Daily Avg)
-            </div>
-            <div className="h-[200px]">
-              <YTMonthlySparkline data={ytMonthly} />
-            </div>
-          </div>
-
-          {/* Insights */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-3">What's working</h3>
-            <ul className="space-y-2 text-[13px] text-gray-700">
-              {(() => {
-                const out: string[] = [];
-                // YouTube momentum
-                if (ytMonthly.length >= 2) {
-                  const last = ytMonthly[ytMonthly.length - 1];
-                  const prev = ytMonthly[ytMonthly.length - 2];
-                  if (last.mom_pct !== null) {
-                    out.push(`YouTube daily views are ${last.mom_pct >= 0 ? "up" : "down"} ${Math.abs(last.mom_pct)}% month-over-month (${fmt(last.daily_avg)} vs ${fmt(prev.daily_avg)} daily avg).`);
-                  }
-                }
-                // Top Dianne post context
-                if (bestDianneThisMonth) {
-                  out.push(`Dianne's best ${currentMonth} post had ${fmt(bestDianneThisMonth.impressions)} impressions with ${bestDianneThisMonth.reactions} reactions — ${((bestDianneThisMonth.reactions / Math.max(bestDianneThisMonth.impressions, 1)) * 100).toFixed(2)}% reaction rate.`);
-                }
-                // TDP growth
-                const tdpSorted = [...(data.linkedin_tdp_weekly ?? [])];
-                if (tdpSorted.length >= 2) {
-                  const lastTDP = tdpSorted[tdpSorted.length - 1];
-                  if (lastTDP.ctr > 30) out.push(`TDP Page CTR is unusually high (${lastTDP.ctr}%) — likely a small audience base with high-intent clicks.`);
-                }
-                // X spike detection
-                const xw = data.twitter_weekly ?? [];
-                if (xw.length > 0) {
-                  const maxX = xw.reduce((a, b) => (a.engagements > b.engagements ? a : b));
-                  const avgX = xw.reduce((s, w) => s + w.engagements, 0) / xw.length;
-                  if (maxX.engagements > avgX * 3) {
-                    out.push(`X had a breakout week ${maxX.week}: ${fmt(maxX.engagements)} engagements (~${Math.round(maxX.engagements / Math.max(avgX, 1))}× your average), net +${maxX.follows - maxX.unfollows} follows.`);
-                  }
-                }
-                // Best video overall
-                const allVids = [...data.youtube_videos].sort((a, b) => b.views - a.views);
-                if (allVids[0]) {
-                  out.push(`Top video all-time: "${allVids[0].title}" — ${fmt(allVids[0].views)} views, ${allVids[0].ctr}% CTR.`);
-                }
-                return out.length > 0 ? out.map((t, i) => (
-                  <li key={i} className="flex gap-2"><span className="text-gray-400">•</span><span>{t}</span></li>
-                )) : <li className="text-gray-400 italic">Not enough data yet for insights.</li>;
-              })()}
-            </ul>
-          </div>
-        </div>
-      )}
 
       {/* ===== YOUTUBE ===== */}
       {section === "youtube" && (

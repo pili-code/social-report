@@ -31,7 +31,6 @@ function LastUpdated() {
 }
 
 const NAV_ITEMS = [
-  { key: "overview", label: "Overview", color: "#2E86AB" },
   { key: "youtube", label: "YouTube", color: "#C0392B" },
   { key: "shorts", label: "Shorts", color: "#E67E22" },
   { key: "linkedin-dianne", label: "LinkedIn: Dianne", color: "#0077B5" },
@@ -44,7 +43,7 @@ const NAV_ITEMS = [
 function SidebarNav() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const currentTab = searchParams.get("tab") || "overview";
+  const currentTab = searchParams.get("tab") || "youtube";
   const isUpload = pathname === "/upload";
 
   return (
