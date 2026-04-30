@@ -1,0 +1,160 @@
+---
+name: update-gtm-data
+description: Weekly playbook for refreshing the GTM hub. Ingests fresh exports from YouTube Studio, LinkedIn (Dianne posts + TDP page), X/Twitter, and Tally workshop signups; runs the relevant upload scripts; verifies data integrity (no duplicate weeks, monthly totals match Studio); commits and pushes. Use when the user asks to update / refresh the GTM dashboard or says "let's do the weekly update".
+disable-model-invocation: true
+allowed-tools: Bash Edit Read Write
+argument-hint: [channel?]
+---
+
+# Weekly GTM data update
+
+You are walking the user through a weekly refresh of the GTM hub. Move **one channel at a time** — this user prefers stepwise confirmation over batch runs. Don't run multiple uploads in parallel.
+
+If `$ARGUMENTS` is non-empty, treat it as the channel to start with (`youtube`, `linkedin-dianne`, `linkedin-tdp`, `twitter`, or `workshop-signups`). Otherwise, list channels and ask which to update first.
+
+## Channels and their upload scripts
+
+| Channel | Source file pattern | Script | Tables affected |
+|---|---|---|---|
+| YouTube | `~/Downloads/Content YYYY-MM-DD_YYYY-MM-DD The Design Project.zip` | `scripts/upload-youtube.mjs` | `youtube_weekly`, `youtube_monthly`, `youtube_videos`, `shorts_weekly` |
+| LinkedIn Dianne | `~/Downloads/SinglePostAnalytics_Dianne Alter_*.xlsx` (one per post) | inline upsert + `scripts/rebuild-linkedin-monthly.mjs` | `linkedin_dianne_posts`, `linkedin_dianne_monthly` |
+| LinkedIn TDP page | `~/Downloads/thedesignproject_content_*.xls` | `scripts/upload-linkedin-tdp.mjs` | `linkedin_tdp_weekly` |
+| X / Twitter | `~/Downloads/account_overview_analytics*.csv` | `scripts/upload-twitter.mjs` | `twitter_weekly` (wipes + rebuilds) |
+| Workshop signups | `~/Downloads/Sign up for our design-to-code workshop!_Submissions_*.csv` | `scripts/upload-workshop-signups.mjs` | `workshop_signups`, plus `youtube_videos.utm_slug` |
+
+## Workflow per channel
+
+For each channel the user wants to update:
+
+1. **Ask for the export file path** — don't assume. Files in `~/Downloads/` accumulate; the user knows which is the new one.
+2. **Verify the file exists** with `ls -la <path>`.
+3. **Update the script's hardcoded source path** if needed:
+   - `upload-youtube.mjs` has `const DIR = "..."` — point at the unzipped export folder.
+   - `upload-twitter.mjs` has `const CSV_FILE = "..."` — point at the new CSV.
+   - `upload-linkedin-tdp.mjs` has the file path inside `parseTDP(...)` — update there.
+   - `upload-workshop-signups.mjs` has `const CSV_FILE = "..."`.
+   - For LinkedIn Dianne, there is no canonical script; use the inline upsert pattern below.
+4. **Unzip if it's a `.zip`** to a folder of the same name.
+5. **Run the script** with `node scripts/<name>.mjs`.
+6. **Verify the output** — print row counts, look for new vs upserted ratio.
+7. **Then move to the next channel** (after user confirms).
+
+## YouTube — known pitfalls
+
+The YouTube weekly upsert is keyed on the `week` column, which is computed from the **min/max date in the data** for that week, not the calendar Sun→Sat range. When a new export starts/ends mid-week, partial-week labels (`Apr 19–Apr 21, 2026`) and full-week labels (`Apr 19–Apr 25, 2026`) coexist as **separate rows** instead of upserting. After every YouTube upload:
+
+```bash
+# Check for overlapping weekly rows
+node --input-type=module -e "
+import dotenv from 'dotenv'; import path from 'node:path';
+dotenv.config({ path: path.join(process.cwd(), '.env.local') });
+import('@supabase/supabase-js').then(async ({ createClient }) => {
+  const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false }});
+  const { data } = await sb.from('youtube_weekly').select('id, week, days, views').order('id');
+  data.forEach(r => console.log(r.id, r.week, 'days='+r.days, 'views='+r.views));
+});
+"
+```
+
+If you see two rows whose date ranges overlap (e.g. `Apr 19–Apr 21` AND `Apr 19–Apr 25`), delete the partial one (lower `days` count) and re-run the monthly rebuild.
+
+## YouTube monthly aggregation
+
+`youtube_monthly` is rebuilt from `Totals.csv` daily rows aggregated by **calendar month** (not by week-start month). This matches YouTube Studio exactly. The `upload-youtube.mjs` script handles this; if you ever need to recompute manually, use `Totals.csv` and group by `MONTHS[d.getUTCMonth()] + ' ' + year`.
+
+Sanity check after upload:
+```
+Apr 2026 in DB should match YouTube Studio → Channel analytics → Last 28 days
+```
+If they diverge by more than ~1%, investigate.
+
+## LinkedIn Dianne — inline upsert (no canonical script)
+
+Each post is its own xlsx file. Sheet name is `Post analytics`. Pattern:
+
+```bash
+node --input-type=module -e "
+import dotenv from 'dotenv'; import path from 'node:path';
+dotenv.config({ path: path.join(process.cwd(), '.env.local') });
+import('@supabase/supabase-js').then(async ({ createClient }) => {
+  const XLSX = (await import('xlsx')).default;
+  const fs = await import('node:fs');
+  const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false }});
+  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const fmtDay = d => MONTHS[d.getUTCMonth()] + ' ' + d.getUTCDate();
+  const startOfWeek = d => { const o = new Date(d); o.setUTCDate(o.getUTCDate() - o.getUTCDay()); o.setUTCHours(0,0,0,0); return o; };
+  const weekLabel = d => { const s = startOfWeek(d); const e = new Date(s); e.setUTCDate(e.getUTCDate()+6); return fmtDay(s) + '–' + fmtDay(e) + ', ' + s.getUTCFullYear(); };
+  const toNum = v => v == null || v === '' ? 0 : Number(String(v).replace(/,/g,'')) || 0;
+
+  const file = '<PASTE_FILE_PATH_HERE>';
+  const wb = XLSX.read(fs.readFileSync(file));
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets['Post analytics'], { header: 1, raw: false, defval: null });
+  const kv = new Map();
+  for (const r of rows) if (r?.[0]) kv.set(String(r[0]).trim(), r[1]);
+
+  const d = new Date(kv.get('Post Date'));
+  const row = {
+    week: weekLabel(d), date: d.toISOString().slice(0,10),
+    post_time: String(kv.get('Post Publish Time') ?? '').trim(),
+    impressions: toNum(kv.get('Impressions')), reactions: toNum(kv.get('Reactions')),
+    comments: toNum(kv.get('Comments')), reposts: toNum(kv.get('Reposts')),
+    saves: toNum(kv.get('Saves')), followers: toNum(kv.get('Followers gained from this post')),
+    note: '',
+  };
+  console.log(row);
+  const { error } = await sb.from('linkedin_dianne_posts').upsert(row, { onConflict: 'week,date' });
+  if (error) throw error;
+  console.log('Upserted');
+});
+"
+```
+
+After upserting any new posts, **always** run `node scripts/rebuild-linkedin-monthly.mjs` to refresh `linkedin_dianne_monthly` MoM percentages.
+
+The same `Post Date` reuploaded with fresher numbers will **update in place** (key is `week,date`). Use this for refreshing impressions on older posts.
+
+If the user is unsure which posts are new, query the latest:
+```bash
+node --input-type=module -e "...select('date').order('date',{ascending:false}).limit(5)..."
+```
+and compare to LinkedIn.
+
+## Twitter — wipe and rebuild
+
+`upload-twitter.mjs` deletes all rows in `twitter_weekly` and rebuilds from the daily CSV. This is intentional — the script re-aggregates by Sun→Sat week using a `2025-10-01` cutoff. Just run it; no incremental logic needed.
+
+## Workshop signups
+
+`upload-workshop-signups.mjs` does two things:
+1. Sets `utm_slug` on each `youtube_videos` row using the `VIDEO_SLUGS` map at the top of the script.
+2. Upserts all rows from the Tally CSV into `workshop_signups` (keyed on `submission_id`).
+
+When a new video is published:
+- Add it to `VIDEO_SLUGS` in the script.
+- Update the YouTube description with `https://tally.so/r/WOPNPP?utm_source=youtube&utm_medium=video&utm_campaign=<slug>`.
+- (Note: signups land in `utm_campaign`, not `utm_content` — the dashboard's Video Log table reads `utm_campaign` first, then falls back to `utm_content`.)
+
+## After all channels are updated
+
+1. **Sanity-check the dashboard** at https://tdp-social-dashboard.vercel.app/dashboard — open YouTube tab, confirm the latest week appears in the Weekly Detail and the latest video appears in the Video Log.
+2. **Show the user a summary** — bullet list of what changed (rows added/upserted per table).
+3. **Ask before committing.** If any script files were modified (DIR/CSV_FILE constants, VIDEO_SLUGS map), include them. Use a clean commit message.
+4. **Don't push automatically.** Confirm with the user before `git push`.
+
+## Channel-skipping
+
+It's normal for a week to have no updates for some channels (e.g. TDP page didn't post anything, no new long-form video). Skip them — don't force a re-run if there's no new file.
+
+## Diagnosing a broken dashboard
+
+If the production dashboard shows "Loading..." after an update:
+- `curl https://tdp-social-dashboard.vercel.app/api/data` — if 500, check Vercel env vars match `.env.local`.
+- If 200 but tables empty, the env vars probably point at the wrong Supabase project.
+- If 200 with data but UI hangs, check browser console for chart-render errors (often caused by overlapping weekly rows — see "YouTube — known pitfalls" above).
+
+## What NOT to do
+
+- Don't change dashboard structure (sections, columns, layout) as part of a data update. Keep ingestion separate from UI changes.
+- Don't run `git push --force` or amend pushed commits.
+- Don't `git add -A` — stage individual modified files so you don't accidentally commit unrelated work in progress.
+- Don't write the user's Supabase service role key to chat history.
