@@ -32,6 +32,7 @@ interface DataSet {
   cold_email_campaigns: Array<{ campaign: string; status: string; window: string; sent: number; contacted: number; replies: number; reply_rate: number; interested: number; note: string }>;
   twitter_weekly: Array<{ week: string; impressions: number; likes: number; engagements: number; bookmarks: number; shares: number; follows: number; unfollows: number; replies: number; reposts: number; profile_visits: number; video_views: number; note: string }>;
   workshop_signups: Array<{ submission_id: string; submitted_at: string; utm_source: string; utm_medium: string; utm_campaign: string; utm_content: string }>;
+  community_funnel_weekly: Array<{ week: string; launch_video_title: string; launch_video_published: string; launch_views: number; launch_visits: number; backfill_views: number; backfill_visits: number; direct_visits: number; referral_visits: number; other_visits: number; total_visits: number; clicks: number; conversions: number; revenue_cents: number; source_breakdown_json: string; note: string }>;
 }
 
 const UTM_TRACKING_START = new Date(Date.UTC(2026, 3, 22)); // 2026-04-22
@@ -45,6 +46,24 @@ function Trend({ value, suffix = "%" }: { value: number | null; suffix?: string 
     <span className={`inline-block px-1.5 py-0.5 rounded text-[11px] font-semibold font-mono ${up ? "bg-[#D5F5E3] text-[#1E8449]" : "bg-[#FADBD8] text-[#C0392B]"}`}>
       {up ? "▲" : "▼"} {Math.abs(value)}{suffix}
     </span>
+  );
+}
+
+function InfoIcon() {
+  return (
+    <svg className="w-3 h-3 text-gray-400 cursor-help shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" strokeWidth="1.8" />
+      <line x1="12" y1="11" x2="12" y2="16" strokeWidth="1.8" strokeLinecap="round" />
+      <circle cx="12" cy="8" r="0.8" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function Tooltip({ children }: { children: ReactNode }) {
+  return (
+    <div className="hidden group-hover:block absolute z-20 left-0 top-full mt-1.5 w-80 bg-gray-900 text-white text-[11px] leading-relaxed rounded-lg p-3 shadow-xl">
+      {children}
+    </div>
   );
 }
 
@@ -156,6 +175,7 @@ function FilterBar({ range, onChange }: { range: TimeRange; onChange: (r: TimeRa
 function DashboardContent() {
   const [rawData, setRawData] = useState<DataSet | null>(null);
   const [range, setRange] = useState<TimeRange>("6m");
+  const [expandedFunnelStage, setExpandedFunnelStage] = useState<string | null>(null);
   const searchParams = useSearchParams();
   const section = searchParams.get("tab") || "youtube";
 
@@ -722,6 +742,300 @@ function DashboardContent() {
           </div>
         </div>
       )}
+
+      {/* ===== COMMUNITY FUNNEL ===== */}
+      {section === "community" && (() => {
+        const rows = data.community_funnel_weekly ?? [];
+        const latest = rows[rows.length - 1];
+
+        if (!latest) {
+          return (
+            <div>
+              <SectionHeader title="Community Funnel" color="#5955ff" badge="Awaiting first period" />
+              <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">
+                No community funnel rows yet. After running the SQL migration, insert the first period via the inline upsert documented in the skill.
+              </div>
+            </div>
+          );
+        }
+
+        const cr1 = latest.launch_views > 0 ? (latest.launch_visits / latest.launch_views) * 100 : null;
+        const cr2 = latest.clicks > 0 ? (latest.conversions / latest.clicks) * 100 : null;
+        let sources: Array<{ source: string; campaign: string; content: string; country?: string; sessions: number }> = [];
+        let countries: Array<{ country: string; sessions: number }> = [];
+        try {
+          if (latest.source_breakdown_json) {
+            const parsed = JSON.parse(latest.source_breakdown_json);
+            // Support both old shape (array) and new shape ({sources, countries})
+            if (Array.isArray(parsed)) {
+              sources = parsed;
+            } else {
+              sources = parsed.sources ?? [];
+              countries = parsed.countries ?? [];
+            }
+          }
+        } catch {}
+
+        const stages = [
+          { label: "Views", value: latest.launch_views, sub: latest.launch_video_title || "Launch video", note: latest.launch_video_published, pending: false, tip: "Lifetime YouTube views on the launch video. This is the top of the funnel — every other stage is a percentage of this." },
+          { label: "Launch visits", value: latest.launch_visits, sub: cr1 !== null ? `${cr1.toFixed(2)}% view → visit` : "", note: `${latest.total_visits} total /community/ sessions`, pending: false, tip: `Sessions on /community/ where the URL had ?utm_campaign=community_launch. Only counts visits we can attribute to the launch video (description, pinned comment, end card). The remaining ${latest.total_visits - latest.launch_visits} sessions came from elsewhere — backfill videos, direct/typed, github, gmail — but those aren't attributable to the launch.` },
+          { label: "Clicks", value: latest.clicks, sub: "", note: latest.clicks === 0 ? "Tracking pending" : "", pending: latest.clicks === 0, tip: "Clicks on the \"Join community\" CTA on the /community/ page. Requires a GA4 key event configured in GA4 admin → Events → Mark as key event. Once wired, this will populate automatically on each weekly export." },
+          { label: "Conversions", value: latest.conversions, sub: cr2 !== null ? `${cr2.toFixed(2)}% click → conv` : "", note: latest.revenue_cents > 0 ? `$${(latest.revenue_cents / 100).toLocaleString()}` : (latest.conversions === 0 ? "Tracking pending" : ""), pending: latest.conversions === 0, tip: "Paid community subscriptions in this period. Requires a sync from the billing system (Whop / Stripe / wherever subs are taken). Until that's wired, this stays at 0 and cr2 (click → conv) is null." },
+        ];
+        const maxVal = Math.max(...stages.map((s) => s.value), 1);
+        const ACCENT = "#1A5276";
+
+        return (
+          <div>
+            <SectionHeader title="Community Funnel" color={ACCENT} badge={latest.week} />
+
+            {/* Funnel viz */}
+            <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-4">Stages — launch video attribution</div>
+              <div className="space-y-2.5">
+                {stages.map((s, i) => {
+                  const widthPct = s.pending ? 0 : (s.value / maxVal) * 100;
+                  const expandable = s.label === "Launch visits";
+                  const isExpanded = expandable && expandedFunnelStage === s.label;
+                  // Compute drill-down for Launch visits
+                  const launchBreakdown: Array<{ medium: string; sessions: number }> = [];
+                  if (expandable) {
+                    const map = new Map<string, number>();
+                    for (const src of sources) {
+                      if (src.campaign !== "community_launch") continue;
+                      // src.source is like "youtube / description" — pull medium from the right side
+                      const medium = src.source.split("/").map((p) => p.trim())[1] ?? src.source;
+                      map.set(medium, (map.get(medium) ?? 0) + src.sessions);
+                    }
+                    for (const [medium, sessions] of map) launchBreakdown.push({ medium, sessions });
+                    launchBreakdown.sort((a, b) => b.sessions - a.sessions);
+                  }
+                  return (
+                    <Fragment key={i}>
+                      <div className="relative group flex items-center gap-4">
+                        <div className="w-32 shrink-0 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-600">
+                          <span>{s.label}</span>
+                          <InfoIcon />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={expandable ? () => setExpandedFunnelStage(isExpanded ? null : s.label) : undefined}
+                          disabled={!expandable}
+                          className={`flex-1 relative h-11 bg-gray-50 rounded-lg overflow-hidden border text-left ${expandable ? "border-gray-200 hover:border-[#1A5276] cursor-pointer" : "border-gray-100 cursor-default"}`}
+                        >
+                          {!s.pending && (
+                            <div
+                              className="absolute inset-y-0 left-0 rounded-lg"
+                              style={{ width: `${Math.max(widthPct, 1)}%`, background: ACCENT, opacity: 0.12 }}
+                            />
+                          )}
+                          <div className="absolute inset-0 flex items-center px-3.5 gap-3">
+                            <span className={`font-mono text-lg font-bold ${s.pending ? "text-gray-300" : "text-gray-900"}`}>{s.pending ? "—" : fmt(s.value)}</span>
+                            {s.sub && <span className="text-[11px] text-gray-500">{s.sub}</span>}
+                            {expandable && (
+                              <span className="ml-auto flex items-center gap-1 text-[10px] uppercase tracking-wider text-gray-400">
+                                {isExpanded ? "Hide breakdown" : "Click to expand"}
+                                <svg className={`w-3 h-3 transition-transform ${isExpanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                              </span>
+                            )}
+                          </div>
+                        </button>
+                        <div className="w-44 shrink-0 text-[11px] text-gray-500 truncate" title={s.note}>{s.note}</div>
+                        <Tooltip>{s.tip}</Tooltip>
+                      </div>
+                      {expandable && isExpanded && (
+                        <div className="ml-36 mr-48 -mt-1 mb-2 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">By placement on the launch video</div>
+                          <div className="space-y-1.5">
+                            {launchBreakdown.map((b) => {
+                              const pct = s.value > 0 ? (b.sessions / s.value) * 100 : 0;
+                              const niceLabel = b.medium === "description" ? "Description link" : b.medium === "pinned_comment" ? "Pinned comment" : b.medium === "card" ? "End card" : b.medium;
+                              return (
+                                <div key={b.medium} className="flex items-center gap-3 text-[12px]">
+                                  <div className="w-28 text-gray-700">{niceLabel}</div>
+                                  <div className="flex-1 h-2 bg-white rounded-full overflow-hidden">
+                                    <div className="h-full rounded-full" style={{ width: `${pct}%`, background: ACCENT, opacity: 0.5 }} />
+                                  </div>
+                                  <div className="w-24 text-right">
+                                    <span className="font-mono font-semibold text-gray-900">{b.sessions}</span>
+                                    <span className="text-gray-400 ml-1.5">{pct.toFixed(0)}%</span>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          <div className="mt-2.5 pt-2.5 border-t border-gray-200 text-[11px] text-gray-500">
+                            <strong className="text-gray-700">Description link</strong> = link in the YouTube video description. <strong className="text-gray-700">Pinned comment</strong> = top comment Diane pinned with the community URL. <strong className="text-gray-700">End card</strong> = the clickable card that pops up at the end of the video.
+                          </div>
+                        </div>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </div>
+              {(latest.clicks === 0 || latest.conversions === 0) && (
+                <div className="mt-4 p-3 bg-[#FEF9E7] border border-[#f0e68c] rounded-lg text-[11px] text-[#b7950b]">
+                  <strong>Tracking gap:</strong> click + conversion data is not yet wired. Add a GA4 key event on the &ldquo;Join community&rdquo; CTA, then add a Stripe/Whop sync to populate stages 3 and 4. cr2 will fill in once both are in place.
+                </div>
+              )}
+            </div>
+
+            {/* Backfill side stat + Other-traffic stat */}
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="relative group bg-white rounded-xl border border-gray-200 border-l-4 border-l-[#1A5276] p-4">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Backfill videos</span>
+                  <InfoIcon />
+                </div>
+                <div className="font-mono text-2xl font-bold">{fmt(latest.backfill_views)}</div>
+                <div className="text-[11px] text-gray-500 mt-0.5">lifetime views · {latest.backfill_visits} attributed visits</div>
+                <Tooltip>Combined lifetime views across the 3 older videos whose YouTube descriptions were retroactively updated to point at /community/. These are tagged with utm_campaign=community_backfill. Side stat — not part of the funnel itself, since most of these views happened before the community existed.</Tooltip>
+              </div>
+              <div className="relative group bg-white rounded-xl border border-gray-200 p-4">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Direct + Referral</span>
+                  <InfoIcon />
+                </div>
+                <div className="font-mono text-2xl font-bold">{fmt(latest.direct_visits + latest.referral_visits)}</div>
+                <div className="text-[11px] text-gray-500 mt-0.5">{latest.direct_visits} direct · {latest.referral_visits} referral</div>
+                <Tooltip><strong>Direct ({latest.direct_visits}):</strong> visitor typed the URL, used a bookmark, or came from an untracked source (HTTPS→HTTP, email apps, Slack). GA4 can&apos;t see where they came from.<br /><br /><strong>Referral ({latest.referral_visits}):</strong> visitor clicked a link from another site without a UTM tag — github.com (18), mail.google.com (6), youtube.com page itself (5).<br /><br />Many of these are likely TDP team testing the page (Argentina = 55% of all traffic).</Tooltip>
+              </div>
+              <div className="relative group bg-white rounded-xl border border-gray-200 p-4">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Total page sessions</span>
+                  <InfoIcon />
+                </div>
+                <div className="font-mono text-2xl font-bold">{fmt(latest.total_visits)}</div>
+                <div className="text-[11px] text-gray-500 mt-0.5">all sources, all UTM</div>
+                <Tooltip>Every session to /community/ during the period, regardless of source. Equals launch_visits + backfill_visits + direct + referral + other. The funnel uses Launch visits ({latest.launch_visits}) instead of this total because Alex&apos;s spec was launch-video-attribution only.</Tooltip>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              {/* Source breakdown */}
+              {sources.length > 0 && (() => {
+                // Aggregate sources by source/medium/campaign (drop country dimension here for readability)
+                const aggMap = new Map<string, { source: string; campaign: string; content: string; sessions: number }>();
+                for (const s of sources) {
+                  const k = `${s.source}|${s.campaign}|${s.content}`;
+                  const existing = aggMap.get(k);
+                  if (existing) existing.sessions += s.sessions;
+                  else aggMap.set(k, { source: s.source, campaign: s.campaign, content: s.content, sessions: s.sessions });
+                }
+                const agg = [...aggMap.values()].sort((a, b) => b.sessions - a.sessions);
+                return (
+                  <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                    <div className="px-4 py-3 text-[13px] font-semibold border-b border-gray-200">Visit sources</div>
+                    <div className="max-h-[340px] overflow-y-auto">
+                      <table className="w-full text-[13px]">
+                        <thead className="sticky top-0 bg-gray-50">
+                          <tr>
+                            {["Source / Medium", "Campaign", "Sessions"].map(h => (
+                              <th key={h} className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {agg.map((s, i) => (
+                            <tr key={i} className="border-t border-gray-100">
+                              <td className="px-3.5 py-2.5 text-[12px]">{s.source}</td>
+                              <td className="px-3.5 py-2.5 text-[11px] text-gray-500 max-w-[200px] truncate" title={`${s.campaign} · ${s.content}`}>{s.campaign || "—"}{s.content ? ` · ${s.content.slice(0, 30)}` : ""}</td>
+                              <td className="px-3.5 py-2.5 font-mono text-xs">{fmt(s.sessions)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Country breakdown */}
+              {countries.length > 0 && (() => {
+                const totalC = countries.reduce((s, c) => s + c.sessions, 0);
+                return (
+                  <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                    <div className="px-4 py-3 text-[13px] font-semibold border-b border-gray-200 flex items-center justify-between">
+                      <span>By country</span>
+                      <span className="text-[11px] font-normal text-gray-400">{countries.length} countries · {totalC} sessions</span>
+                    </div>
+                    <div className="max-h-[340px] overflow-y-auto">
+                      <table className="w-full text-[13px]">
+                        <thead className="sticky top-0 bg-gray-50">
+                          <tr>
+                            {["Country", "Sessions", "Share"].map(h => (
+                              <th key={h} className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {countries.map((c, i) => {
+                            const pct = totalC > 0 ? (c.sessions / totalC) * 100 : 0;
+                            return (
+                              <tr key={i} className="border-t border-gray-100">
+                                <td className="px-3.5 py-2.5 text-[12px]">{c.country}</td>
+                                <td className="px-3.5 py-2.5 font-mono text-xs">{fmt(c.sessions)}</td>
+                                <td className="px-3.5 py-2.5">
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden max-w-[120px]">
+                                      <div className="h-full rounded-full" style={{ width: `${pct}%`, background: ACCENT, opacity: 0.4 }} />
+                                    </div>
+                                    <span className="text-[11px] font-mono text-gray-500 w-10 text-right">{pct.toFixed(0)}%</span>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* History */}
+            {rows.length > 1 && (
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
+                <div className="px-4 py-3 text-[13px] font-semibold border-b border-gray-200">Period history</div>
+                <table className="w-full text-[13px]">
+                  <thead>
+                    <tr className="bg-gray-50">
+                      {["Week", "Launch views", "Launch visits", "cr1", "Clicks", "Conv.", "Revenue"].map(h => (
+                        <th key={h} className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...rows].reverse().map((r, i) => {
+                      const c = r.launch_views > 0 ? (r.launch_visits / r.launch_views) * 100 : null;
+                      return (
+                        <tr key={i} className={i === 0 ? "bg-[#1A5276]/5" : ""}>
+                          <td className="px-3.5 py-2.5">{r.week}</td>
+                          <td className="px-3.5 py-2.5 font-mono text-xs">{fmt(r.launch_views)}</td>
+                          <td className="px-3.5 py-2.5 font-mono text-xs">{fmt(r.launch_visits)}</td>
+                          <td className="px-3.5 py-2.5 font-mono text-xs">{c !== null ? c.toFixed(2) + "%" : "—"}</td>
+                          <td className="px-3.5 py-2.5 font-mono text-xs">{r.clicks || "—"}</td>
+                          <td className="px-3.5 py-2.5 font-mono text-xs">{r.conversions || "—"}</td>
+                          <td className="px-3.5 py-2.5 font-mono text-xs">{r.revenue_cents > 0 ? "$" + (r.revenue_cents / 100).toLocaleString() : "—"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {latest.note && (
+              <div className="bg-white rounded-xl border border-gray-200 p-4 text-[12px] text-gray-600">
+                <strong className="text-gray-700">Note:</strong> {latest.note}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* ===== MONTHLY GROWTH ===== */}
       {section === "monthly-growth" && (() => {

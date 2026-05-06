@@ -21,6 +21,7 @@ If `$ARGUMENTS` is non-empty, treat it as the channel to start with (`youtube`, 
 | LinkedIn TDP page | `~/Downloads/thedesignproject_content_*.xls` | `scripts/upload-linkedin-tdp.mjs` | `linkedin_tdp_weekly` |
 | X / Twitter | `~/Downloads/account_overview_analytics*.csv` | `scripts/upload-twitter.mjs` | `twitter_weekly` (wipes + rebuilds) |
 | Workshop signups | `~/Downloads/Sign up for our design-to-code workshop!_Submissions_*.csv` | `scripts/upload-workshop-signups.mjs` | `workshop_signups`, plus `youtube_videos.utm_slug` |
+| Community funnel | `~/Downloads/download (N).csv` (GA4) + `~/Downloads/Clarity_The_Design_Project_*.csv` | inline upsert, see "Community funnel" below | `community_funnel_weekly` |
 
 ## Workflow per channel
 
@@ -57,6 +58,25 @@ import('@supabase/supabase-js').then(async ({ createClient }) => {
 ```
 
 If you see two rows whose date ranges overlap (e.g. `Apr 19–Apr 21` AND `Apr 19–Apr 25`), delete the partial one (lower `days` count) and re-run the monthly rebuild.
+
+### Mixed-shape upsert error on `youtube_monthly`
+
+If `node scripts/upload-youtube.mjs` fails with:
+
+```
+Error: youtube_monthly: null value in column "id" of relation "youtube_monthly" violates not-null constraint
+```
+
+…it's because the upsert batch contains a mix of existing rows (which carry their `id` from the prior fetch) and a brand-new month with no `id`. Postgres unifies columns across the VALUES list and writes `null` into the missing slots; the `id bigserial` default never fires because the row literally sends `id: null`.
+
+The `upsert(...)` helper in `scripts/upload-youtube.mjs` strips `id` before sending — same pattern as `lib/db.ts`'s `stripMeta`. If you ever revert or rewrite that helper, keep the `id` strip:
+
+```js
+const { id: _id, ...rest } = r;
+seen.set(k, rest);
+```
+
+This affects any monthly aggregate run that introduces a new calendar month (typically the first run of a new month).
 
 ## YouTube monthly aggregation
 
@@ -133,6 +153,58 @@ When a new video is published:
 - Add it to `VIDEO_SLUGS` in the script.
 - Update the YouTube description with `https://tally.so/r/WOPNPP?utm_source=youtube&utm_medium=video&utm_campaign=<slug>`.
 - (Note: signups land in `utm_campaign`, not `utm_content` — the dashboard's Video Log table reads `utm_campaign` first, then falls back to `utm_content`.)
+
+## Community funnel
+
+Tracks the TDP Community launch funnel per the spec from Alex (May 2026 GTM meeting):
+
+```
+Views (X) → Visits (Y) cr1% → Clicks (Z) → Conversions ($m) cr2%
+```
+
+Stage 1 attribution is the **launch video only** — the most recent video tagged with `utm_campaign=community_launch&utm_content=launch_video`. Backfill videos (older content with descriptions retroactively pointing at /community/) are tracked as a side stat (lifetime views + attributed visits) but not part of the funnel itself.
+
+### Required exports each week
+
+1. **GA4** — Reports → User acquisition → filtered to `landing page contains "/community/"` with breakdown columns: Session source/medium, Session manual campaign name, Session manual ad content, Country, Sessions, Active users, Key events, Engagement rate. Date range = the week being updated. Save as `~/Downloads/download (N).csv`.
+2. **Clarity** — Recordings filtered to `Visited URL starts with https://designproject.io/community/`. Date range = the week. Export to CSV. Used for cross-checking and qualitative review (not automatically aggregated).
+
+### Computing the row
+
+Open the GA4 CSV. The columns are `Session source / medium, Session manual campaign name, Session manual ad content, Country, Sessions, Active users, Key events, Engagement rate`. Aggregate sessions into:
+
+| Bucket | Filter |
+|---|---|
+| `launch_visits` | `campaign = community_launch` |
+| `backfill_visits` | `campaign = community_backfill` |
+| `direct_visits` | `source = (direct) / (none)` |
+| `referral_visits` | source contains `referral` or `youtube.com` |
+| `other_visits` | everything else |
+| `total_visits` | sum of above |
+
+For Stage 1 (`launch_views`), look up the **most recent** YouTube video tagged with `community_launch` (Pili confirms which one — usually that week's or the prior week's main video) and read `views` from `youtube_videos`. Use only the views that accumulated **after** the description went live; for the first row this is lifetime views since launch is recent.
+
+For `backfill_views`, sum lifetime views for each video referenced in `community_backfill` content slugs. The slug naming (e.g. `i_built_my_entire_design_system_in_4_hou`) is truncated; match by checking the YouTube description manually.
+
+### Seeding the first row
+
+```bash
+node scripts/_seed-community-funnel.mjs
+```
+
+That script has the Apr 8 – May 5 numbers hardcoded. After the first run, edit the constants for each subsequent week (or copy the upsert pattern inline).
+
+### Click + conversion tracking is not wired
+
+`clicks` and `conversions` will be 0 until:
+1. A GA4 key event fires when a user clicks the "Join community" CTA (configure in GA4 admin → Events → Mark as key event).
+2. A sync from the community billing system (Whop / Stripe / wherever subs are taken) populates `conversions` and `revenue_cents`.
+
+Until then, the dashboard shows a yellow "Tracking gap" callout under the funnel viz. cr2 stays null.
+
+### Schema reminder
+
+The `community_funnel_weekly` table is unique on `week`. Use `upsert(row, { onConflict: 'week' })`. The `source_breakdown_json` column stores the per-source visit breakdown as a JSON-encoded array; the dashboard reads this to render the source-attribution table.
 
 ## After all channels are updated
 

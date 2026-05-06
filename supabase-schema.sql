@@ -1,5 +1,27 @@
 -- Run this in Supabase SQL Editor (Dashboard → SQL Editor → New query)
 
+create table if not exists community_funnel_weekly (
+  id bigserial primary key,
+  week text not null unique,
+  launch_video_title text default '',
+  launch_video_published text default '',
+  launch_views integer default 0,
+  launch_visits integer default 0,
+  backfill_views integer default 0,
+  backfill_visits integer default 0,
+  direct_visits integer default 0,
+  referral_visits integer default 0,
+  other_visits integer default 0,
+  total_visits integer default 0,
+  clicks integer default 0,
+  conversions integer default 0,
+  revenue_cents integer default 0,
+  source_breakdown_json text default '',
+  note text default '',
+  created_at timestamptz default now()
+);
+
+
 create table if not exists youtube_weekly (
   id bigserial primary key,
   week text not null unique,

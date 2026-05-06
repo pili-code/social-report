@@ -13,7 +13,7 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
   auth: { persistSession: false },
 });
 
-const DIR = "/Users/pilitdp/Downloads/Content 2026-01-29_2026-04-29 The Design Project";
+const DIR = "/Users/pilitdp/Downloads/Content 2026-04-08_2026-05-06 The Design Project";
 const SHORTS_MAX = 180;
 // Cutoff: only keep weeks whose START is on or after this date (and videos published >= this date).
 const START_CUTOFF = new Date(Date.UTC(2025, 9, 1)); // 2025-10-01
@@ -41,7 +41,9 @@ async function upsert(table, rows, onConflict) {
   const keys = onConflict.split(",");
   for (const r of rows) {
     const k = keys.map((x) => String(r[x] ?? "")).join("\u0000");
-    seen.set(k, r);
+    const { id: _id, ...rest } = r;
+    void _id;
+    seen.set(k, rest);
   }
   const cleaned = Array.from(seen.values());
   const { error } = await supabase.from(table).upsert(cleaned, { onConflict });

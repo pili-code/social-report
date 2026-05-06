@@ -37,6 +37,7 @@ const NAV_ITEMS = [
   { key: "linkedin-tdp", label: "LinkedIn: TDP Page", color: "#1A5276" },
   { key: "twitter", label: "X (Twitter)", color: "#111111" },
   { key: "cold-email", label: "Cold Email", color: "#6C3483" },
+  { key: "community", label: "Community Funnel", color: "#1A5276" },
   { key: "monthly-growth", label: "Monthly Growth", color: "#117A65" },
 ];
 
