@@ -828,7 +828,7 @@ function DashboardContent() {
                           type="button"
                           onClick={expandable ? () => setExpandedFunnelStage(isExpanded ? null : s.label) : undefined}
                           disabled={!expandable}
-                          className={`flex-1 relative h-11 bg-gray-50 rounded-lg overflow-hidden border text-left ${expandable ? "border-gray-200 hover:border-[#1A5276] cursor-pointer" : "border-gray-100 cursor-default"}`}
+                          className={`flex-1 min-w-0 relative h-11 bg-gray-50 rounded-lg overflow-hidden border text-left ${expandable ? "border-gray-200 hover:border-[#1A5276] cursor-pointer" : "border-gray-100 cursor-default"}`}
                         >
                           {!s.pending && (
                             <div
@@ -836,12 +836,12 @@ function DashboardContent() {
                               style={{ width: `${Math.max(widthPct, 1)}%`, background: ACCENT, opacity: 0.12 }}
                             />
                           )}
-                          <div className="absolute inset-0 flex items-center px-3.5 gap-3">
-                            <span className={`font-mono text-lg font-bold ${s.pending ? "text-gray-300" : "text-gray-900"}`}>{s.pending ? "—" : fmt(s.value)}</span>
-                            {s.sub && <span className="text-[11px] text-gray-500">{s.sub}</span>}
+                          <div className="absolute inset-0 flex items-center px-3.5 gap-3 min-w-0">
+                            <span className={`font-mono text-lg font-bold shrink-0 ${s.pending ? "text-gray-300" : "text-gray-900"}`}>{s.pending ? "—" : fmt(s.value)}</span>
+                            {s.sub && <span className="text-[11px] text-gray-500 truncate min-w-0" title={s.sub}>{s.sub}</span>}
                             {expandable && (
-                              <span className="ml-auto flex items-center gap-1 text-[10px] uppercase tracking-wider text-gray-400">
-                                {isExpanded ? "Hide breakdown" : "Click to expand"}
+                              <span className="ml-auto flex items-center gap-1 text-[10px] uppercase tracking-wider text-gray-400 shrink-0">
+                                <span className="hidden xl:inline">{isExpanded ? "Hide breakdown" : "Click to expand"}</span>
                                 <svg className={`w-3 h-3 transition-transform ${isExpanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                 </svg>
@@ -849,7 +849,7 @@ function DashboardContent() {
                             )}
                           </div>
                         </button>
-                        <div className="w-full sm:w-44 sm:shrink-0 text-[11px] text-gray-500 truncate" title={s.note}>{s.note}</div>
+                        <div className="w-full sm:w-44 sm:shrink-0 lg:hidden xl:block text-[11px] text-gray-500 truncate" title={s.note}>{s.note}</div>
                         <Tooltip>{s.tip}</Tooltip>
                       </div>
                       {expandable && isExpanded && (
@@ -893,7 +893,7 @@ function DashboardContent() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
               <div className="relative group bg-white rounded-xl border border-gray-200 border-l-4 border-l-[#1A5276] p-4">
                 <div className="flex items-center gap-1.5 mb-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Backfill videos</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 whitespace-nowrap">Backfill videos</span>
                   <InfoIcon />
                 </div>
                 <div className="font-mono text-2xl font-bold">{fmt(latest.backfill_views)}</div>
@@ -902,7 +902,7 @@ function DashboardContent() {
               </div>
               <div className="relative group bg-white rounded-xl border border-gray-200 p-4">
                 <div className="flex items-center gap-1.5 mb-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Direct + Referral</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 whitespace-nowrap">Direct + Referral</span>
                   <InfoIcon />
                 </div>
                 <div className="font-mono text-2xl font-bold">{fmt(latest.direct_visits + latest.referral_visits)}</div>
@@ -911,7 +911,7 @@ function DashboardContent() {
               </div>
               <div className="relative group bg-white rounded-xl border border-gray-200 p-4">
                 <div className="flex items-center gap-1.5 mb-1">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Total page sessions</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500 whitespace-nowrap">Total page sessions</span>
                   <InfoIcon />
                 </div>
                 <div className="font-mono text-2xl font-bold">{fmt(latest.total_visits)}</div>
@@ -964,9 +964,9 @@ function DashboardContent() {
                 const totalC = countries.reduce((s, c) => s + c.sessions, 0);
                 return (
                   <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                    <div className="px-4 py-3 text-[13px] font-semibold border-b border-gray-200 flex items-center justify-between">
-                      <span>By country</span>
-                      <span className="text-[11px] font-normal text-gray-400">{countries.length} countries · {totalC} sessions</span>
+                    <div className="px-4 py-3 text-[13px] font-semibold border-b border-gray-200 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                      <span className="whitespace-nowrap">By country</span>
+                      <span className="text-[11px] font-normal text-gray-400 whitespace-nowrap">{countries.length} countries · {totalC} sessions</span>
                     </div>
                     <div className="max-h-[340px] overflow-auto">
                       <table className="w-full text-[13px]">
