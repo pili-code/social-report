@@ -195,7 +195,7 @@ for (const [month, b] of candidates) {
     days: b.days,
     daily_avg: b.days > 0 ? Math.round(b.views / b.days) : 0,
     note: prior.note ?? "",
-    partial: isLatest && !isFull ? 1 : (prior.partial ?? 0),
+    partial: isFull ? 0 : 1,
     projected: prior.projected ?? null,
   });
 }
