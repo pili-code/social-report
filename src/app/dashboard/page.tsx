@@ -61,7 +61,7 @@ function InfoIcon() {
 
 function Tooltip({ children }: { children: ReactNode }) {
   return (
-    <div className="hidden group-hover:block absolute z-20 left-0 top-full mt-1.5 w-80 bg-gray-900 text-white text-[11px] leading-relaxed rounded-lg p-3 shadow-xl">
+    <div className="hidden group-hover:block absolute z-20 left-0 top-full mt-1.5 w-72 sm:w-80 max-w-[calc(100vw-2rem)] bg-gray-900 text-white text-[11px] leading-relaxed rounded-lg p-3 shadow-xl">
       {children}
     </div>
   );
@@ -69,8 +69,8 @@ function Tooltip({ children }: { children: ReactNode }) {
 
 function SectionHeader({ title, color, badge }: { title: string; color: string; badge?: string }) {
   return (
-    <div className="flex items-center gap-3 mb-6 pl-3.5" style={{ borderLeft: `4px solid ${color}` }}>
-      <h2 className="text-xl font-bold tracking-tight">{title}</h2>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 mb-6 pl-3.5" style={{ borderLeft: `4px solid ${color}` }}>
+      <h2 className="text-lg sm:text-xl font-bold tracking-tight">{title}</h2>
       {badge && <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded text-white" style={{ background: color }}>{badge}</span>}
     </div>
   );
@@ -153,9 +153,9 @@ function filterByDate<T extends { date?: string; published?: string }>(rows: T[]
 
 function FilterBar({ range, onChange }: { range: TimeRange; onChange: (r: TimeRange) => void }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 px-4 py-2.5 mb-5 flex items-center gap-3 text-[12px]">
+    <div className="bg-white rounded-xl border border-gray-200 px-4 py-2.5 mb-5 flex flex-wrap items-center gap-3 text-[12px]">
       <span className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">Time range</span>
-      <div className="flex gap-1">
+      <div className="flex flex-wrap gap-1">
         {(Object.keys(RANGE_LABELS) as TimeRange[]).map((r) => (
           <button
             key={r}
@@ -271,7 +271,7 @@ function DashboardContent() {
           {/* Monthly Summary */}
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
             <div className="px-4 py-3 text-[13px] font-semibold border-b border-gray-200">Monthly Summary</div>
-            <table className="w-full text-[13px]">
+            <div className="overflow-x-auto"><table className="w-full text-[13px]">
               <thead>
                 <tr className="bg-gray-50">
                   <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Month</th>
@@ -295,6 +295,7 @@ function DashboardContent() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
 
           {/* Video Log */}
@@ -312,7 +313,7 @@ function DashboardContent() {
                   <span>Video Log (90-day window)</span>
                   <span className="text-[11px] font-normal text-gray-500">UTM tracking started {trackingStartLabel} — videos without a tag show — for Signups/Conv</span>
                 </div>
-                <table className="w-full text-[13px]">
+                <div className="overflow-x-auto"><table className="w-full text-[13px]">
                   <thead>
                     <tr className="bg-gray-50">
                       <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Published</th>
@@ -361,6 +362,7 @@ function DashboardContent() {
                     })}
                   </tbody>
                 </table>
+                </div>
               </div>
             );
           })()}
@@ -384,7 +386,7 @@ function DashboardContent() {
 
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
             <div className="px-4 py-3 text-[13px] font-semibold border-b border-gray-200">Batch Detail</div>
-            <table className="w-full text-[13px]">
+            <div className="overflow-x-auto"><table className="w-full text-[13px]">
               <thead>
                 <tr className="bg-gray-50">
                   <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Week</th>
@@ -415,6 +417,7 @@ function DashboardContent() {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}
@@ -432,7 +435,7 @@ function DashboardContent() {
               <div className="flex items-center gap-2 mb-3">
                 <h3 className="text-[11px] font-bold uppercase tracking-wider text-[#0077B5]">Top Posts — {currentMonth}</h3>
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {[...dianneThisMonth].sort((a, b) => b.impressions - a.impressions).slice(0, 3).map((p, i) => (
                   <div key={i} className="border border-gray-200 rounded-lg p-3.5">
                     <div className="flex items-center justify-between mb-1.5">
@@ -502,7 +505,7 @@ function DashboardContent() {
           {/* Post Log */}
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
             <div className="px-4 py-3 text-[13px] font-semibold border-b border-gray-200">Post Log</div>
-            <table className="w-full text-[13px]">
+            <div className="overflow-x-auto"><table className="w-full text-[13px]">
               <thead>
                 <tr className="bg-gray-50">
                   {["Week", "Date", "Impressions", "Reactions", "Saves", "Followers", "Note"].map(h => (
@@ -527,12 +530,13 @@ function DashboardContent() {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
 
           {/* Monthly Summary */}
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
             <div className="px-4 py-3 text-[13px] font-semibold border-b border-gray-200">Monthly Summary</div>
-            <table className="w-full text-[13px]">
+            <div className="overflow-x-auto"><table className="w-full text-[13px]">
               <thead>
                 <tr className="bg-gray-50">
                   {["Month", "Impressions", "Saves", "Posts", "Imp. MoM", "Saves MoM", "Note"].map(h => (
@@ -554,6 +558,7 @@ function DashboardContent() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}
@@ -568,7 +573,7 @@ function DashboardContent() {
           {/* Top weeks */}
           <div className="bg-white rounded-xl border border-gray-200 border-l-4 border-l-[#1A5276] p-5 mb-6">
             <h3 className="text-[11px] font-bold uppercase tracking-wider text-[#1A5276] mb-3">Top Weeks by Impressions</h3>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {[...data.linkedin_tdp_weekly].sort((a, b) => b.impressions - a.impressions).slice(0, 3).map((w, i) => (
                 <div key={i} className="border border-gray-200 rounded-lg p-3.5">
                   <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">#{i + 1} · {w.week}</div>
@@ -611,7 +616,7 @@ function DashboardContent() {
 
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
             <div className="px-4 py-3 text-[13px] font-semibold border-b border-gray-200">Weekly Performance</div>
-            <table className="w-full text-[13px]">
+            <div className="overflow-x-auto"><table className="w-full text-[13px]">
               <thead>
                 <tr className="bg-gray-50">
                   {["Week", "Impressions", "Clicks", "CTR", "Reactions", "Note"].map(h => (
@@ -635,6 +640,7 @@ function DashboardContent() {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}
@@ -650,7 +656,7 @@ function DashboardContent() {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-4 gap-4 mb-6">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 {(() => {
                   const weeks = data.twitter_weekly;
                   const latest = weeks[weeks.length - 1];
@@ -675,7 +681,7 @@ function DashboardContent() {
               </div>
               <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                 <div className="px-4 py-3 text-[13px] font-semibold border-b border-gray-200">Weekly Performance</div>
-                <table className="w-full text-[13px]">
+                <div className="overflow-x-auto"><table className="w-full text-[13px]">
                   <thead>
                     <tr className="bg-gray-50">
                       {["Week", "Impressions", "Engagements", "Likes", "Replies", "Reposts", "Follows (net)", "Profile Visits"].map(h => (
@@ -701,6 +707,7 @@ function DashboardContent() {
                     })}
                   </tbody>
                 </table>
+                </div>
               </div>
             </>
           )}
@@ -711,7 +718,7 @@ function DashboardContent() {
       {section === "cold-email" && (
         <div>
           <SectionHeader title="Cold Email" color="#6C3483" badge="Outbound Campaigns" />
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
             {data.cold_email_campaigns.map((c, i) => {
               const rateColor = c.reply_rate >= 2 ? "#1E8449" : c.reply_rate >= 1 ? "#b7950b" : "#C0392B";
               const statusCls = c.status === "Active" ? "bg-[#D5F5E3] text-[#1E8449]" : c.status === "Paused" ? "bg-[#FEF9E7] text-[#b7950b]" : "bg-gray-100 text-gray-500";
@@ -812,8 +819,8 @@ function DashboardContent() {
                   }
                   return (
                     <Fragment key={i}>
-                      <div className="relative group flex items-center gap-4">
-                        <div className="w-32 shrink-0 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-600">
+                      <div className="relative group flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-4">
+                        <div className="w-full sm:w-32 sm:shrink-0 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-gray-600">
                           <span>{s.label}</span>
                           <InfoIcon />
                         </div>
@@ -842,11 +849,11 @@ function DashboardContent() {
                             )}
                           </div>
                         </button>
-                        <div className="w-44 shrink-0 text-[11px] text-gray-500 truncate" title={s.note}>{s.note}</div>
+                        <div className="w-full sm:w-44 sm:shrink-0 text-[11px] text-gray-500 truncate" title={s.note}>{s.note}</div>
                         <Tooltip>{s.tip}</Tooltip>
                       </div>
                       {expandable && isExpanded && (
-                        <div className="ml-36 mr-48 -mt-1 mb-2 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                        <div className="sm:ml-36 sm:mr-48 -mt-1 mb-2 bg-gray-50 border border-gray-200 rounded-lg p-3">
                           <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-2">By placement on the launch video</div>
                           <div className="space-y-1.5">
                             {launchBreakdown.map((b) => {
@@ -883,7 +890,7 @@ function DashboardContent() {
             </div>
 
             {/* Backfill side stat + Other-traffic stat */}
-            <div className="grid grid-cols-3 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
               <div className="relative group bg-white rounded-xl border border-gray-200 border-l-4 border-l-[#1A5276] p-4">
                 <div className="flex items-center gap-1.5 mb-1">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Backfill videos</span>
@@ -913,7 +920,7 @@ function DashboardContent() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
               {/* Source breakdown */}
               {sources.length > 0 && (() => {
                 // Aggregate sources by source/medium/campaign (drop country dimension here for readability)
@@ -928,7 +935,7 @@ function DashboardContent() {
                 return (
                   <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                     <div className="px-4 py-3 text-[13px] font-semibold border-b border-gray-200">Visit sources</div>
-                    <div className="max-h-[340px] overflow-y-auto">
+                    <div className="max-h-[340px] overflow-auto">
                       <table className="w-full text-[13px]">
                         <thead className="sticky top-0 bg-gray-50">
                           <tr>
@@ -961,7 +968,7 @@ function DashboardContent() {
                       <span>By country</span>
                       <span className="text-[11px] font-normal text-gray-400">{countries.length} countries · {totalC} sessions</span>
                     </div>
-                    <div className="max-h-[340px] overflow-y-auto">
+                    <div className="max-h-[340px] overflow-auto">
                       <table className="w-full text-[13px]">
                         <thead className="sticky top-0 bg-gray-50">
                           <tr>
@@ -1000,7 +1007,7 @@ function DashboardContent() {
             {rows.length > 1 && (
               <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
                 <div className="px-4 py-3 text-[13px] font-semibold border-b border-gray-200">Period history</div>
-                <table className="w-full text-[13px]">
+                <div className="overflow-x-auto"><table className="w-full text-[13px]">
                   <thead>
                     <tr className="bg-gray-50">
                       {["Week", "Launch views", "Launch visits", "cr1", "Clicks", "Conv.", "Revenue"].map(h => (
@@ -1025,6 +1032,7 @@ function DashboardContent() {
                     })}
                   </tbody>
                 </table>
+                </div>
               </div>
             )}
 
