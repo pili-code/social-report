@@ -188,6 +188,11 @@ for (const [month, b] of candidates) {
   const isFull = b.days >= daysInMonth(month);
   if (!isFull && !isLatest) continue; // skip historical partial months
   const prior = existingByMonth.get(month) ?? {};
+  const projected = isFull
+    ? null // full month: clear any stale projection
+    : b.days > 0
+      ? Math.round((b.views / b.days) * daysInMonth(month))
+      : null;
   merged.set(month, {
     ...prior,
     month,
@@ -196,8 +201,17 @@ for (const [month, b] of candidates) {
     daily_avg: b.days > 0 ? Math.round(b.views / b.days) : 0,
     note: prior.note ?? "",
     partial: isFull ? 0 : 1,
-    projected: prior.projected ?? null,
+    projected,
   });
+}
+
+// Clear stale projections on any full month that wasn't re-aggregated by this
+// export (e.g., a prior partial month is now done but didn't appear in
+// `candidates` because the new export starts mid-month).
+for (const [month, row] of merged) {
+  if (row.partial === 0 && row.projected != null) {
+    merged.set(month, { ...row, projected: null });
+  }
 }
 
 // Recompute MoM across the full chronological series.
