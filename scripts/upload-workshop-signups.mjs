@@ -14,7 +14,7 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 });
 
 const CSV_FILE =
-  "/Users/pilitdp/Downloads/Sign up for our design-to-code workshop!_Submissions_2026-05-06.csv";
+  "/Users/pilitdp/Downloads/Sign up for our design-to-code workshop!_Submissions_2026-05-13.csv";
 
 // utm_content slug → YouTube video title (exact match against youtube_videos.title).
 const VIDEO_SLUGS = {

@@ -14,7 +14,7 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 });
 
 // Single 365-day TDP Page export (Apr 21 2025 → Apr 20 2026).
-const TDP_FILE = "/Users/pilitdp/Downloads/thedesignproject_content_1778094167537.xls";
+const TDP_FILE = "/Users/pilitdp/Downloads/thedesignproject_content_1778696671498.xls";
 // Only keep weeks whose START is on or after this date.
 const START_CUTOFF = new Date(Date.UTC(2025, 9, 1)); // 2025-10-01
 
