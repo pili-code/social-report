@@ -13,6 +13,7 @@ const TABLES = [
   "twitter_weekly",
   "workshop_signups",
   "community_funnel_weekly",
+  "jobboard_funnel_weekly",
 ];
 
 export async function GET() {

@@ -139,3 +139,19 @@ create table if not exists workshop_signups (
 );
 
 alter table youtube_videos add column if not exists utm_slug text default null;
+
+create table if not exists jobboard_funnel_weekly (
+  id bigserial primary key,
+  week text not null unique,
+  banner_launched_at text default '',
+  jobs_page_views integer default 0,
+  banner_clicks integer default 0,
+  other_clicks integer default 0,
+  total_community_clicks integer default 0,
+  newsletter_clicks integer default 0,
+  youtube_clicks integer default 0,
+  conversions integer default 0,
+  revenue_cents integer default 0,
+  note text default '',
+  created_at timestamptz default now()
+);

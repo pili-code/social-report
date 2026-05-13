@@ -33,6 +33,7 @@ interface DataSet {
   twitter_weekly: Array<{ week: string; impressions: number; likes: number; engagements: number; bookmarks: number; shares: number; follows: number; unfollows: number; replies: number; reposts: number; profile_visits: number; video_views: number; note: string }>;
   workshop_signups: Array<{ submission_id: string; submitted_at: string; utm_source: string; utm_medium: string; utm_campaign: string; utm_content: string }>;
   community_funnel_weekly: Array<{ week: string; launch_video_title: string; launch_video_published: string; launch_views: number; launch_visits: number; backfill_views: number; backfill_visits: number; direct_visits: number; referral_visits: number; other_visits: number; total_visits: number; clicks: number; conversions: number; revenue_cents: number; source_breakdown_json: string; note: string }>;
+  jobboard_funnel_weekly: Array<{ week: string; banner_launched_at: string; jobs_page_views: number; banner_clicks: number; other_clicks: number; total_community_clicks: number; newsletter_clicks: number; youtube_clicks: number; conversions: number; revenue_cents: number; note: string }>;
 }
 
 const UTM_TRACKING_START = new Date(Date.UTC(2026, 3, 22)); // 2026-04-22
@@ -1035,6 +1036,92 @@ function DashboardContent() {
                 </div>
               </div>
             )}
+
+            {latest.note && (
+              <div className="bg-white rounded-xl border border-gray-200 p-4 text-[12px] text-gray-600">
+                <strong className="text-gray-700">Note:</strong> {latest.note}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* ===== JOB BOARD FUNNEL (same tab as Community) ===== */}
+      {section === "community" && (() => {
+        const rows = data.jobboard_funnel_weekly ?? [];
+        const latest = rows[rows.length - 1];
+        if (!latest) {
+          return (
+            <div className="mt-8">
+              <SectionHeader title="Job Board Funnel" color="#117A65" badge="Awaiting first period" />
+              <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-gray-400 text-sm">
+                No job board funnel rows yet. Run the SQL migration in supabase-schema.sql, then insert a row for the post-banner period.
+              </div>
+            </div>
+          );
+        }
+
+        const cr1 = latest.jobs_page_views > 0 ? (latest.total_community_clicks / latest.jobs_page_views) * 100 : null;
+        const bannerCtr = latest.jobs_page_views > 0 ? (latest.banner_clicks / latest.jobs_page_views) * 100 : null;
+        const cr2 = latest.total_community_clicks > 0 ? (latest.conversions / latest.total_community_clicks) * 100 : null;
+        const ACCENT = "#117A65";
+
+        const stages = [
+          { label: "/jobs/ views", value: latest.jobs_page_views, sub: "Banner impressions", note: latest.banner_launched_at ? `Banner live since ${latest.banner_launched_at}` : "", pending: false, tip: "Page views on the /jobs/ landing page during this period. This is the top of the job board funnel — every banner impression starts here." },
+          { label: "Clicks → /community/", value: latest.total_community_clicks, sub: cr1 !== null ? `${cr1.toFixed(2)}% click-through` : "", note: `${latest.banner_clicks} banner + ${latest.other_clicks} other CTA`, pending: false, tip: `Sum of GA4 events jobboard_banner_to_community (${latest.banner_clicks}) and jobboard_to_community (${latest.other_clicks}). Banner-only CTR is ${bannerCtr !== null ? bannerCtr.toFixed(2) + "%" : "—"}.` },
+          { label: "Conversions", value: latest.conversions, sub: cr2 !== null ? `${cr2.toFixed(2)}% click → conv` : "", note: latest.revenue_cents > 0 ? `$${(latest.revenue_cents / 100).toLocaleString()}` : (latest.conversions === 0 ? "Tracking pending" : ""), pending: latest.conversions === 0, tip: "Paid community subscriptions attributed to job board clicks. Requires Stripe/Whop sync to populate. Until wired, this stays at 0." },
+        ];
+        const maxVal = Math.max(...stages.map((s) => s.value), 1);
+
+        return (
+          <div className="mt-8">
+            <SectionHeader title="Job Board Funnel" color={ACCENT} badge={latest.week} />
+
+            {/* Funnel viz */}
+            <div className="bg-white rounded-xl border border-gray-200 p-5 mb-4">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-4">Stages — /jobs/ banner attribution</div>
+              <div className="space-y-2.5">
+                {stages.map((s, i) => {
+                  const widthPct = s.pending ? 0 : (s.value / maxVal) * 100;
+                  return (
+                    <div key={i} className="flex items-center gap-3">
+                      <div className="w-[150px] text-[12px] font-semibold text-gray-700 flex items-center gap-1.5">
+                        {s.label}
+                      </div>
+                      <div className="flex-1 relative h-9 bg-gray-100 rounded">
+                        <div className="absolute inset-y-0 left-0 rounded" style={{ width: `${Math.max(widthPct, 4)}%`, background: s.pending ? "repeating-linear-gradient(45deg, #f7e9c0, #f7e9c0 6px, #fef9e7 6px, #fef9e7 12px)" : ACCENT }} />
+                        <div className="absolute inset-0 flex items-center px-3 text-[12px] font-bold" style={{ color: s.pending ? "#7d6608" : "white", mixBlendMode: s.pending ? "normal" : "difference" }}>
+                          {s.pending ? "Pending" : fmt(s.value)}
+                        </div>
+                      </div>
+                      <div className="w-[220px] text-[11px] text-gray-500">
+                        {s.sub && <div className="font-semibold text-gray-700">{s.sub}</div>}
+                        {s.note && <div>{s.note}</div>}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Side stats: other /jobs/ click destinations */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+              <div className="bg-white rounded-xl border border-gray-200 p-4">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">Banner CTR (alone)</div>
+                <div className="text-[20px] font-bold text-gray-900">{bannerCtr !== null ? bannerCtr.toFixed(2) + "%" : "—"}</div>
+                <div className="text-[11px] text-gray-500 mt-1">{latest.banner_clicks} of {latest.jobs_page_views} /jobs/ viewers clicked the banner</div>
+              </div>
+              <div className="bg-white rounded-xl border border-gray-200 p-4">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">Other /jobs/ → newsletter</div>
+                <div className="text-[20px] font-bold text-gray-900">{fmt(latest.newsletter_clicks)}</div>
+                <div className="text-[11px] text-gray-500 mt-1">jobboard_to_newsletter — side signal, not in funnel</div>
+              </div>
+              <div className="bg-white rounded-xl border border-gray-200 p-4">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">Other /jobs/ → youtube</div>
+                <div className="text-[20px] font-bold text-gray-900">{fmt(latest.youtube_clicks)}</div>
+                <div className="text-[11px] text-gray-500 mt-1">jobboard_to_youtube — side signal, not in funnel</div>
+              </div>
+            </div>
 
             {latest.note && (
               <div className="bg-white rounded-xl border border-gray-200 p-4 text-[12px] text-gray-600">
