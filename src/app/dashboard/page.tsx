@@ -752,6 +752,66 @@ function DashboardContent() {
       )}
 
       {/* ===== COMMUNITY FUNNEL ===== */}
+      {/* ===== CHANNEL COMPARISON (top of community tab) ===== */}
+      {section === "community" && (() => {
+        const yt = (data.community_funnel_weekly ?? [])[(data.community_funnel_weekly ?? []).length - 1];
+        const jb = (data.jobboard_funnel_weekly ?? [])[(data.jobboard_funnel_weekly ?? []).length - 1];
+        if (!yt || !jb) return null;
+
+        const ytCr1 = yt.launch_views > 0 ? (yt.launch_visits / yt.launch_views) * 100 : 0;
+        const jbCr1 = jb.jobs_page_views > 0 ? (jb.total_community_clicks / jb.jobs_page_views) * 100 : 0;
+        const intentMultiple = ytCr1 > 0 ? (jbCr1 / ytCr1) : 0;
+        const reachMultiple = jb.jobs_page_views > 0 ? (yt.launch_views / jb.jobs_page_views) : 0;
+
+        const YT = "#1A5276";
+        const JB = "#117A65";
+
+        return (
+          <div className="mb-8">
+            <SectionHeader title="Channel Comparison" color={YT} badge="YouTube vs Job Board → /community/" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+              {/* YouTube column */}
+              <div className="bg-white rounded-xl border border-gray-200 p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <div className="text-[11px] font-bold uppercase tracking-wider" style={{ color: YT }}>YouTube</div>
+                    <div className="text-[10px] text-gray-500">{yt.week}</div>
+                  </div>
+                  <div className="text-[10px] px-2 py-0.5 rounded bg-gray-100 text-gray-600">Launch video attribution</div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-[12px]"><span className="text-gray-600">Top of funnel</span><span className="font-bold">{fmt(yt.launch_views)} views</span></div>
+                  <div className="flex items-center justify-between text-[12px]"><span className="text-gray-600">↳ top → action</span><span className="font-bold" style={{ color: YT }}>{ytCr1.toFixed(2)}%</span></div>
+                  <div className="flex items-center justify-between text-[12px]"><span className="text-gray-600">Action count</span><span className="font-bold">{fmt(yt.launch_visits)} visits</span></div>
+                  <div className="flex items-center justify-between text-[12px]"><span className="text-gray-600">Clicks (on /community/)</span><span className="font-bold text-gray-400">{yt.clicks > 0 ? fmt(yt.clicks) : "tracking pending"}</span></div>
+                  <div className="flex items-center justify-between text-[12px] pt-2 border-t border-gray-100"><span className="text-gray-600">Conversions</span><span className="font-bold">{yt.conversions}</span></div>
+                </div>
+              </div>
+              {/* Job Board column */}
+              <div className="bg-white rounded-xl border border-gray-200 p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <div className="text-[11px] font-bold uppercase tracking-wider" style={{ color: JB }}>Job Board</div>
+                    <div className="text-[10px] text-gray-500">{jb.week}</div>
+                  </div>
+                  <div className="text-[10px] px-2 py-0.5 rounded bg-gray-100 text-gray-600">Banner attribution</div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-[12px]"><span className="text-gray-600">Top of funnel</span><span className="font-bold">{fmt(jb.jobs_page_views)} /jobs/ views</span></div>
+                  <div className="flex items-center justify-between text-[12px]"><span className="text-gray-600">↳ top → action</span><span className="font-bold" style={{ color: JB }}>{jbCr1.toFixed(2)}%</span></div>
+                  <div className="flex items-center justify-between text-[12px]"><span className="text-gray-600">Action count</span><span className="font-bold">{fmt(jb.total_community_clicks)} clicks</span></div>
+                  <div className="flex items-center justify-between text-[12px]"><span className="text-gray-600">Banner alone</span><span className="font-bold">{jb.banner_clicks} clicks ({jb.jobs_page_views > 0 ? ((jb.banner_clicks / jb.jobs_page_views) * 100).toFixed(2) : "0"}%)</span></div>
+                  <div className="flex items-center justify-between text-[12px] pt-2 border-t border-gray-100"><span className="text-gray-600">Conversions</span><span className="font-bold">{jb.conversions}</span></div>
+                </div>
+              </div>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-3 text-[11px] text-gray-600 leading-relaxed">
+              <strong className="text-gray-700">Read:</strong> YouTube has ~{reachMultiple.toFixed(0)}× the top-of-funnel reach. Job board converts intent ~{intentMultiple.toFixed(1)}× harder per impression ({jbCr1.toFixed(2)}% vs {ytCr1.toFixed(2)}%). Different scales — YouTube is volume play, job board is intent play. Conversion attribution is blocked on both until Stripe/Whop sync is wired.
+            </div>
+          </div>
+        );
+      })()}
+
       {section === "community" && (() => {
         const rows = data.community_funnel_weekly ?? [];
         const latest = rows[rows.length - 1];
@@ -1104,23 +1164,46 @@ function DashboardContent() {
               </div>
             </div>
 
-            {/* Side stats: other /jobs/ click destinations */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">Banner CTR (alone)</div>
-                <div className="text-[20px] font-bold text-gray-900">{bannerCtr !== null ? bannerCtr.toFixed(2) + "%" : "—"}</div>
-                <div className="text-[11px] text-gray-500 mt-1">{latest.banner_clicks} of {latest.jobs_page_views} /jobs/ viewers clicked the banner</div>
-              </div>
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">Other /jobs/ → newsletter</div>
-                <div className="text-[20px] font-bold text-gray-900">{fmt(latest.newsletter_clicks)}</div>
-                <div className="text-[11px] text-gray-500 mt-1">jobboard_to_newsletter — side signal, not in funnel</div>
-              </div>
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
-                <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">Other /jobs/ → youtube</div>
-                <div className="text-[20px] font-bold text-gray-900">{fmt(latest.youtube_clicks)}</div>
-                <div className="text-[11px] text-gray-500 mt-1">jobboard_to_youtube — side signal, not in funnel</div>
-              </div>
+            {/* All GA4 click events from /jobs/ */}
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-4">
+              <div className="px-4 py-3 text-[13px] font-semibold border-b border-gray-200">All click events tracked from /jobs/</div>
+              <table className="w-full text-[13px]">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">GA4 Event</th>
+                    <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Destination</th>
+                    <th className="text-right px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Clicks</th>
+                    <th className="text-right px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">CTR</th>
+                    <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">In funnel?</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    { event: "jobboard_banner_to_community", dest: "/community/", clicks: latest.banner_clicks, inFunnel: true },
+                    { event: "jobboard_to_community", dest: "/community/", clicks: latest.other_clicks, inFunnel: true },
+                    { event: "jobboard_to_newsletter", dest: "/newsletter/", clicks: latest.newsletter_clicks, inFunnel: false },
+                    { event: "jobboard_to_youtube", dest: "YouTube channel", clicks: latest.youtube_clicks, inFunnel: false },
+                  ].sort((a, b) => b.clicks - a.clicks).map((row, i) => {
+                    const ctr = latest.jobs_page_views > 0 ? (row.clicks / latest.jobs_page_views) * 100 : 0;
+                    return (
+                      <tr key={i} className={row.inFunnel ? "bg-[#e8f8f5]" : ""}>
+                        <td className="px-3.5 py-2.5 font-mono text-xs">{row.event}</td>
+                        <td className="px-3.5 py-2.5 text-gray-600">{row.dest}</td>
+                        <td className="px-3.5 py-2.5 font-mono text-xs text-right font-bold">{fmt(row.clicks)}</td>
+                        <td className="px-3.5 py-2.5 font-mono text-xs text-right">{ctr.toFixed(2)}%</td>
+                        <td className="px-3.5 py-2.5 text-[11px]">{row.inFunnel ? <span className="inline-block px-1.5 py-0.5 rounded bg-[#117A65] text-white font-semibold">yes</span> : <span className="text-gray-400">side signal</span>}</td>
+                      </tr>
+                    );
+                  })}
+                  <tr className="border-t-2 border-gray-200">
+                    <td className="px-3.5 py-2.5 font-bold text-gray-700">All tracked clicks from /jobs/</td>
+                    <td className="px-3.5 py-2.5"></td>
+                    <td className="px-3.5 py-2.5 font-mono text-xs text-right font-bold">{fmt(latest.banner_clicks + latest.other_clicks + latest.newsletter_clicks + latest.youtube_clicks)}</td>
+                    <td className="px-3.5 py-2.5 font-mono text-xs text-right font-bold">{latest.jobs_page_views > 0 ? (((latest.banner_clicks + latest.other_clicks + latest.newsletter_clicks + latest.youtube_clicks) / latest.jobs_page_views) * 100).toFixed(2) : "0"}%</td>
+                    <td className="px-3.5 py-2.5"></td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
 
             {latest.note && (
