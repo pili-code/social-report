@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@google-analytics/data": "^6.0.0",
     "@supabase/supabase-js": "^2.103.2",
     "@thedesignproject/feedback-widget": "^0.3.4",
     "chart.js": "^4.5.1",
