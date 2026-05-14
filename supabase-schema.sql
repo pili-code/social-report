@@ -161,3 +161,4 @@ alter table jobboard_funnel_weekly add column if not exists jobs_landing_views i
 alter table jobboard_funnel_weekly add column if not exists community_landings integer default 0;
 alter table jobboard_funnel_weekly add column if not exists community_success_views integer default 0;
 alter table jobboard_funnel_weekly add column if not exists community_total_views integer default 0;
+alter table jobboard_funnel_weekly add column if not exists community_total_users integer default 0;

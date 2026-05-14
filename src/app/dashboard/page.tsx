@@ -33,7 +33,7 @@ interface DataSet {
   twitter_weekly: Array<{ week: string; impressions: number; likes: number; engagements: number; bookmarks: number; shares: number; follows: number; unfollows: number; replies: number; reposts: number; profile_visits: number; video_views: number; note: string }>;
   workshop_signups: Array<{ submission_id: string; submitted_at: string; utm_source: string; utm_medium: string; utm_campaign: string; utm_content: string }>;
   community_funnel_weekly: Array<{ week: string; launch_video_title: string; launch_video_published: string; launch_views: number; launch_visits: number; backfill_views: number; backfill_visits: number; direct_visits: number; referral_visits: number; other_visits: number; total_visits: number; clicks: number; conversions: number; revenue_cents: number; source_breakdown_json: string; note: string }>;
-  jobboard_funnel_weekly: Array<{ week: string; banner_launched_at: string; jobs_page_views: number; jobs_landing_views: number; banner_clicks: number; other_clicks: number; total_community_clicks: number; community_landings: number; community_success_views: number; community_total_views: number; newsletter_clicks: number; youtube_clicks: number; conversions: number; revenue_cents: number; note: string }>;
+  jobboard_funnel_weekly: Array<{ week: string; banner_launched_at: string; jobs_page_views: number; jobs_landing_views: number; banner_clicks: number; other_clicks: number; total_community_clicks: number; community_landings: number; community_success_views: number; community_total_views: number; community_total_users: number; newsletter_clicks: number; youtube_clicks: number; conversions: number; revenue_cents: number; note: string }>;
 }
 
 const UTM_TRACKING_START = new Date(Date.UTC(2026, 3, 22)); // 2026-04-22
@@ -1171,6 +1171,25 @@ function DashboardContent() {
                     </div>
                   );
                 })}
+              </div>
+            </div>
+
+            {/* /community/ reach context for this period */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+              <div className="bg-white rounded-xl border border-gray-200 p-4">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">/community/ unique visitors</div>
+                <div className="text-[24px] font-bold text-gray-900">{fmt(latest.community_total_users)}</div>
+                <div className="text-[11px] text-gray-500 mt-1">{fmt(latest.community_total_views)} total views ({latest.community_total_users > 0 ? (latest.community_total_views / latest.community_total_users).toFixed(2) : "0"} views/user)</div>
+              </div>
+              <div className="bg-white rounded-xl border border-gray-200 p-4">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">From job board (closed funnel)</div>
+                <div className="text-[24px] font-bold" style={{ color: "#117A65" }}>{fmt(latest.community_landings)}</div>
+                <div className="text-[11px] text-gray-500 mt-1">{latest.community_total_users > 0 ? ((latest.community_landings / latest.community_total_users) * 100).toFixed(1) : "0"}% of all /community/ visitors this period</div>
+              </div>
+              <div className="bg-white rounded-xl border border-gray-200 p-4">
+                <div className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mb-1">From other channels</div>
+                <div className="text-[24px] font-bold text-gray-900">{fmt(Math.max(latest.community_total_users - latest.community_landings, 0))}</div>
+                <div className="text-[11px] text-gray-500 mt-1">YouTube + direct + referral + other</div>
               </div>
             </div>
 
