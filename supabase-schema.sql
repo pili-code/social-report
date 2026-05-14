@@ -155,3 +155,9 @@ create table if not exists jobboard_funnel_weekly (
   note text default '',
   created_at timestamptz default now()
 );
+
+-- May 13 schema extension: closed-funnel + banner-page granularity
+alter table jobboard_funnel_weekly add column if not exists jobs_landing_views integer default 0;
+alter table jobboard_funnel_weekly add column if not exists community_landings integer default 0;
+alter table jobboard_funnel_weekly add column if not exists community_success_views integer default 0;
+alter table jobboard_funnel_weekly add column if not exists community_total_views integer default 0;

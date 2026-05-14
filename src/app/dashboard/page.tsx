@@ -33,7 +33,7 @@ interface DataSet {
   twitter_weekly: Array<{ week: string; impressions: number; likes: number; engagements: number; bookmarks: number; shares: number; follows: number; unfollows: number; replies: number; reposts: number; profile_visits: number; video_views: number; note: string }>;
   workshop_signups: Array<{ submission_id: string; submitted_at: string; utm_source: string; utm_medium: string; utm_campaign: string; utm_content: string }>;
   community_funnel_weekly: Array<{ week: string; launch_video_title: string; launch_video_published: string; launch_views: number; launch_visits: number; backfill_views: number; backfill_visits: number; direct_visits: number; referral_visits: number; other_visits: number; total_visits: number; clicks: number; conversions: number; revenue_cents: number; source_breakdown_json: string; note: string }>;
-  jobboard_funnel_weekly: Array<{ week: string; banner_launched_at: string; jobs_page_views: number; banner_clicks: number; other_clicks: number; total_community_clicks: number; newsletter_clicks: number; youtube_clicks: number; conversions: number; revenue_cents: number; note: string }>;
+  jobboard_funnel_weekly: Array<{ week: string; banner_launched_at: string; jobs_page_views: number; jobs_landing_views: number; banner_clicks: number; other_clicks: number; total_community_clicks: number; community_landings: number; community_success_views: number; community_total_views: number; newsletter_clicks: number; youtube_clicks: number; conversions: number; revenue_cents: number; note: string }>;
 }
 
 const UTM_TRACKING_START = new Date(Date.UTC(2026, 3, 22)); // 2026-04-22
@@ -759,8 +759,10 @@ function DashboardContent() {
         if (!yt || !jb) return null;
 
         const ytCr1 = yt.launch_views > 0 ? (yt.launch_visits / yt.launch_views) * 100 : 0;
+        // Top of funnel for job board = any /jobs/* viewers (closed-funnel definition)
         const jbCr1 = jb.jobs_page_views > 0 ? (jb.total_community_clicks / jb.jobs_page_views) * 100 : 0;
-        const intentMultiple = ytCr1 > 0 ? (jbCr1 / ytCr1) : 0;
+        // Banner-page-only CTR (more relevant for "is the banner working?")
+        const jbBannerPageCtr = jb.jobs_landing_views > 0 ? (jb.total_community_clicks / jb.jobs_landing_views) * 100 : 0;
         const reachMultiple = jb.jobs_page_views > 0 ? (yt.launch_views / jb.jobs_page_views) : 0;
 
         const YT = "#1A5276";
@@ -797,16 +799,20 @@ function DashboardContent() {
                   <div className="text-[10px] px-2 py-0.5 rounded bg-gray-100 text-gray-600">Banner attribution</div>
                 </div>
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between text-[12px]"><span className="text-gray-600">Top of funnel</span><span className="font-bold">{fmt(jb.jobs_page_views)} /jobs/ views</span></div>
-                  <div className="flex items-center justify-between text-[12px]"><span className="text-gray-600">↳ top → action</span><span className="font-bold" style={{ color: JB }}>{jbCr1.toFixed(2)}%</span></div>
-                  <div className="flex items-center justify-between text-[12px]"><span className="text-gray-600">Action count</span><span className="font-bold">{fmt(jb.total_community_clicks)} clicks</span></div>
-                  <div className="flex items-center justify-between text-[12px]"><span className="text-gray-600">Banner alone</span><span className="font-bold">{jb.banner_clicks} clicks ({jb.jobs_page_views > 0 ? ((jb.banner_clicks / jb.jobs_page_views) * 100).toFixed(2) : "0"}%)</span></div>
-                  <div className="flex items-center justify-between text-[12px] pt-2 border-t border-gray-100"><span className="text-gray-600">Conversions</span><span className="font-bold">{jb.conversions}</span></div>
+                  <div className="flex items-center justify-between text-[12px]"><span className="text-gray-600">Top of funnel (any /jobs/*)</span><span className="font-bold">{fmt(jb.jobs_page_views)} views</span></div>
+                  <div className="flex items-center justify-between text-[12px]"><span className="text-gray-600">↳ top → click</span><span className="font-bold" style={{ color: JB }}>{jbCr1.toFixed(3)}%</span></div>
+                  <div className="flex items-center justify-between text-[12px]"><span className="text-gray-600">Clicks to /community/</span><span className="font-bold">{fmt(jb.total_community_clicks)}</span></div>
+                  <div className="flex items-center justify-between text-[12px]"><span className="text-gray-600">↳ click → landed</span><span className="font-bold" style={{ color: JB }}>{jb.total_community_clicks > 0 ? ((jb.community_landings / jb.total_community_clicks) * 100).toFixed(1) : "0"}%</span></div>
+                  <div className="flex items-center justify-between text-[12px]"><span className="text-gray-600">Landed on /community/</span><span className="font-bold">{fmt(jb.community_landings)}</span></div>
+                  <div className="flex items-center justify-between text-[12px] pt-2 border-t border-gray-100"><span className="text-gray-600">/community/success/</span><span className="font-bold">{jb.community_success_views} ({jb.conversions} confirmed conv)</span></div>
+                  {jb.jobs_landing_views > 0 && (
+                    <div className="flex items-center justify-between text-[11px] text-gray-500 pt-1"><span>Banner-page CTR (/jobs/ only)</span><span className="font-bold">{jbBannerPageCtr.toFixed(2)}% on {fmt(jb.jobs_landing_views)} views</span></div>
+                  )}
                 </div>
               </div>
             </div>
             <div className="bg-gray-50 rounded-xl p-3 text-[11px] text-gray-600 leading-relaxed">
-              <strong className="text-gray-700">Read:</strong> YouTube has ~{reachMultiple.toFixed(0)}× the top-of-funnel reach. Job board converts intent ~{intentMultiple.toFixed(1)}× harder per impression ({jbCr1.toFixed(2)}% vs {ytCr1.toFixed(2)}%). Different scales — YouTube is volume play, job board is intent play. Conversion attribution is blocked on both until Stripe/Whop sync is wired.
+              <strong className="text-gray-700">Read:</strong> YouTube has ~{reachMultiple.toFixed(2)}× the launch-video top-of-funnel reach vs job board /jobs/*. But job board top-of-funnel is mostly individual listings — when narrowed to /jobs/ banner-page views ({fmt(jb.jobs_landing_views)}), banner CTR is {jbBannerPageCtr.toFixed(2)}% vs YouTube&apos;s {ytCr1.toFixed(2)}% view → visit. Different attribution models — closed funnel for job board ({jbCr1.toFixed(3)}% strict), looser launch-content attribution for YouTube.
             </div>
           </div>
         );
@@ -1126,10 +1132,14 @@ function DashboardContent() {
         const cr2 = latest.total_community_clicks > 0 ? (latest.conversions / latest.total_community_clicks) * 100 : null;
         const ACCENT = "#117A65";
 
+        const cr1Landed = latest.total_community_clicks > 0 ? (latest.community_landings / latest.total_community_clicks) * 100 : null;
+        const cr1Success = latest.community_landings > 0 ? (latest.community_success_views / latest.community_landings) * 100 : null;
+
         const stages = [
-          { label: "/jobs/ views", value: latest.jobs_page_views, sub: "Banner impressions", note: latest.banner_launched_at ? `Banner live since ${latest.banner_launched_at}` : "", pending: false, tip: "Page views on the /jobs/ landing page during this period. This is the top of the job board funnel — every banner impression starts here." },
-          { label: "Clicks → /community/", value: latest.total_community_clicks, sub: cr1 !== null ? `${cr1.toFixed(2)}% click-through` : "", note: `${latest.banner_clicks} banner + ${latest.other_clicks} other CTA`, pending: false, tip: `Sum of GA4 events jobboard_banner_to_community (${latest.banner_clicks}) and jobboard_to_community (${latest.other_clicks}). Banner-only CTR is ${bannerCtr !== null ? bannerCtr.toFixed(2) + "%" : "—"}.` },
-          { label: "Conversions", value: latest.conversions, sub: cr2 !== null ? `${cr2.toFixed(2)}% click → conv` : "", note: latest.revenue_cents > 0 ? `$${(latest.revenue_cents / 100).toLocaleString()}` : (latest.conversions === 0 ? "Tracking pending" : ""), pending: latest.conversions === 0, tip: "Paid community subscriptions attributed to job board clicks. Requires Stripe/Whop sync to populate. Until wired, this stays at 0." },
+          { label: "/jobs/* views", value: latest.jobs_page_views, sub: "Any /jobs/* page (top of closed funnel)", note: latest.jobs_landing_views > 0 ? `${fmt(latest.jobs_landing_views)} on /jobs/ landing alone` : "", pending: false, tip: "Total page views across all /jobs/* paths during this period — the top of the closed funnel as GA4 reports it. Most of this volume is individual job listing pages; the banner sits on /jobs/ landing specifically." },
+          { label: "Clicks → /community/", value: latest.total_community_clicks, sub: cr1 !== null ? `${cr1.toFixed(3)}% top → click` : "", note: `${latest.banner_clicks} banner + ${latest.other_clicks} other CTA`, pending: false, tip: `Sum of GA4 events jobboard_banner_to_community (${latest.banner_clicks}) and jobboard_to_community (${latest.other_clicks}). Banner-page CTR (vs /jobs/ landing only) is ${latest.jobs_landing_views > 0 ? ((latest.total_community_clicks / latest.jobs_landing_views) * 100).toFixed(2) + "%" : "—"}.` },
+          { label: "Landed on /community/", value: latest.community_landings, sub: cr1Landed !== null ? `${cr1Landed.toFixed(1)}% click → landed` : "", note: "Closed funnel: viewed /community/ after click", pending: false, tip: "Users who actually reached /community/ after clicking the CTA, in sequence. From the GA4 closed-funnel report. Not all clickers land — some bounce, drop the session, etc." },
+          { label: "/community/success/", value: latest.community_success_views, sub: cr1Success !== null ? `${cr1Success.toFixed(1)}% landed → success` : "", note: latest.conversions > 0 ? `${latest.conversions} confirmed conversions` : (latest.community_success_views > 0 ? "Likely conversion — needs Stripe confirmation" : "Tracking pending"), pending: latest.community_success_views === 0 && latest.conversions === 0, tip: "Page views on /community/success/ during this period. This is the GA4-side proxy for a completed signup. Confirmed conversion count requires Stripe/Whop sync." },
         ];
         const maxVal = Math.max(...stages.map((s) => s.value), 1);
 
