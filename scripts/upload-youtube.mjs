@@ -13,7 +13,7 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
   auth: { persistSession: false },
 });
 
-const DIR = "/Users/pilitdp/Downloads/Content 2026-02-26_2026-05-27 The Design Project";
+const DIR = "/Users/pilitdp/Downloads/Content 2022-04-27_2026-06-03 The Design Project";
 const SHORTS_MAX = 180;
 // Cutoff: only keep weeks whose START is on or after this date (and videos published >= this date).
 const START_CUTOFF = new Date(Date.UTC(2025, 9, 1)); // 2025-10-01
@@ -51,6 +51,34 @@ async function upsert(table, rows, onConflict) {
   return cleaned.length;
 }
 
+// Remove overlapping weekly rows. A prior export may have written a partial-week
+// row (e.g. "May 24–May 26", days=3) for a week this export now completes
+// ("May 24–May 30", days=7). Both share a week-start+year and would double-count.
+// Keep the row with the most days; delete the rest.
+async function dedupeWeekly() {
+  const { data: rows, error } = await supabase.from("youtube_weekly").select("id,week,days");
+  if (error) throw new Error(`dedupeWeekly read: ${error.message}`);
+  const byStart = new Map();
+  for (const r of rows) {
+    const m = r.week.match(/^(\w+ \d+)–.*?(\d{4})$/);
+    if (!m) continue;
+    const key = `${m[1]} ${m[2]}`; // start month-day + year
+    const arr = byStart.get(key) ?? [];
+    arr.push(r);
+    byStart.set(key, arr);
+  }
+  const toDelete = [];
+  for (const group of byStart.values()) {
+    if (group.length < 2) continue;
+    group.sort((a, b) => b.days - a.days); // keeper = most days
+    for (const r of group.slice(1)) toDelete.push(r.id);
+  }
+  if (toDelete.length === 0) return 0;
+  const { error: delErr } = await supabase.from("youtube_weekly").delete().in("id", toDelete);
+  if (delErr) throw new Error(`dedupeWeekly delete: ${delErr.message}`);
+  return toDelete.length;
+}
+
 // ---- 1. Totals.csv → youtube_weekly (daily → weekly aggregation) ----
 const totals = readCsv("Totals.csv");
 const ytBuckets = new Map();
@@ -77,6 +105,8 @@ const ytWeekly = [...ytBuckets.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).m
 console.log(`youtube_weekly: upserting ${ytWeekly.length} weeks (Totals.csv, >= ${START_CUTOFF.toISOString().slice(0,10)})`);
 const ytWeeklyInserted = await upsert("youtube_weekly", ytWeekly, "week");
 console.log(`  → ${ytWeeklyInserted} rows upserted`);
+const ytWeeklyDeduped = await dedupeWeekly();
+console.log(`  → ${ytWeeklyDeduped} overlapping weekly row(s) removed`);
 
 // ---- 2. Table data.csv → split by Duration → youtube_videos + shorts_weekly ----
 // Filter to videos published on/after START_CUTOFF.

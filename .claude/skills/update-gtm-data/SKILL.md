@@ -42,10 +42,13 @@ For each channel the user wants to update:
 
 ## YouTube — known pitfalls
 
-The YouTube weekly upsert is keyed on the `week` column, which is computed from the **min/max date in the data** for that week, not the calendar Sun→Sat range. When a new export starts/ends mid-week, partial-week labels (`Apr 19–Apr 21, 2026`) and full-week labels (`Apr 19–Apr 25, 2026`) coexist as **separate rows** instead of upserting. After every YouTube upload:
+The YouTube weekly upsert is keyed on the `week` column, which is computed from the **min/max date in the data** for that week, not the calendar Sun→Sat range. When a new export starts/ends mid-week, partial-week labels (`Apr 19–Apr 21, 2026`) and full-week labels (`Apr 19–Apr 25, 2026`) coexist as **separate rows** instead of upserting.
+
+**This is now auto-healed.** `scripts/upload-youtube.mjs` runs a `dedupeWeekly()` pass right after the weekly upsert: it groups `youtube_weekly` rows by week-start (month-day + year), and when more than one shares a start it keeps the row with the most `days` and deletes the rest. The script prints `→ N overlapping weekly row(s) removed` on each run. Monthly totals are unaffected (they're rebuilt from daily `Totals.csv`, not from weekly rows), so no monthly rebuild is needed after dedup.
+
+You normally don't need to do anything here. To spot-check after an upload, confirm the dedup line read `0` (or removed exactly the stale partials you expected), and optionally list the latest weeks:
 
 ```bash
-# Check for overlapping weekly rows
 node --input-type=module -e "
 import dotenv from 'dotenv'; import path from 'node:path';
 dotenv.config({ path: path.join(process.cwd(), '.env.local') });
@@ -57,7 +60,7 @@ import('@supabase/supabase-js').then(async ({ createClient }) => {
 "
 ```
 
-If you see two rows whose date ranges overlap (e.g. `Apr 19–Apr 21` AND `Apr 19–Apr 25`), delete the partial one (lower `days` count) and re-run the monthly rebuild.
+The only legitimate non-7-day rows are the **first** week (cutoff boundary) and the **current in-progress** week. Any other short row sharing a start with a 7-day row is a stale partial — and `dedupeWeekly()` will have already removed it. If you ever need to disable this (e.g. intentionally keeping a partial), remove the `dedupeWeekly()` call after the weekly upsert.
 
 ### Mixed-shape upsert error on `youtube_monthly`
 
@@ -208,7 +211,7 @@ The `community_funnel_weekly` table is unique on `week`. Use `upsert(row, { onCo
 
 ## After all channels are updated
 
-1. **Sanity-check the dashboard** at https://tdp-social-dashboard.vercel.app/dashboard — open YouTube tab, confirm the latest week appears in the Weekly Detail and the latest video appears in the Video Log.
+1. **Sanity-check the dashboard** at https://gtm-app-lovat.vercel.app/dashboard — open YouTube tab, confirm the latest week appears in the Weekly Detail and the latest video appears in the Video Log.
 2. **Show the user a summary** — bullet list of what changed (rows added/upserted per table).
 3. **Ask before committing.** If any script files were modified (DIR/CSV_FILE constants, VIDEO_SLUGS map), include them. Use a clean commit message.
 4. **Don't push automatically.** Confirm with the user before `git push`.
@@ -220,7 +223,7 @@ It's normal for a week to have no updates for some channels (e.g. TDP page didn'
 ## Diagnosing a broken dashboard
 
 If the production dashboard shows "Loading..." after an update:
-- `curl https://tdp-social-dashboard.vercel.app/api/data` — if 500, check Vercel env vars match `.env.local`.
+- `curl https://gtm-app-lovat.vercel.app/api/data` — if 500, check Vercel env vars match `.env.local`.
 - If 200 but tables empty, the env vars probably point at the wrong Supabase project.
 - If 200 with data but UI hangs, check browser console for chart-render errors (often caused by overlapping weekly rows — see "YouTube — known pitfalls" above).
 

@@ -13,7 +13,7 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
   auth: { persistSession: false },
 });
 
-const CSV_FILE = "/Users/pilitdp/Downloads/account_overview_analytics.csv";
+const CSV_FILE = "/Users/pilitdp/Downloads/account_overview_analytics (1).csv";
 const START_CUTOFF = new Date(Date.UTC(2025, 9, 1)); // 2025-10-01
 
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
