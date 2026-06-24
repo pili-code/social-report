@@ -162,3 +162,18 @@ alter table jobboard_funnel_weekly add column if not exists community_landings i
 alter table jobboard_funnel_weekly add column if not exists community_success_views integer default 0;
 alter table jobboard_funnel_weekly add column if not exists community_total_views integer default 0;
 alter table jobboard_funnel_weekly add column if not exists community_total_users integer default 0;
+
+-- Jun 4: YouTube search traffic by calendar month (from "Traffic source type" export).
+-- Mirrors youtube_monthly: partial months flagged + projected to full-month estimate.
+create table if not exists youtube_search_monthly (
+  id bigserial primary key,
+  month text not null unique,
+  views integer not null,
+  days integer not null,
+  daily_avg integer not null,
+  mom_pct double precision,
+  partial integer default 0,
+  projected integer,
+  note text default '',
+  created_at timestamptz default now()
+);

@@ -5,6 +5,7 @@ const TABLES = [
   "youtube_weekly",
   "youtube_monthly",
   "youtube_videos",
+  "youtube_search_monthly",
   "shorts_weekly",
   "linkedin_dianne_posts",
   "linkedin_dianne_monthly",

@@ -25,6 +25,7 @@ interface DataSet {
   youtube_weekly: Array<{ week: string; month: string; views: number; current: number }>;
   youtube_monthly: Array<{ month: string; views: number; days: number; daily_avg: number; mom_pct: number | null; note: string; partial: number; projected: number | null }>;
   youtube_videos: Array<{ published: string; title: string; views: number; impressions: number; ctr: number; subs: number; note: string; utm_slug: string | null }>;
+  youtube_search_monthly: Array<{ month: string; views: number; days: number; daily_avg: number; mom_pct: number | null; partial: number; projected: number | null; note: string }>;
   shorts_weekly: Array<{ week: string; clips: number; total_views: number; avg_per_clip: number; impressions: number; note: string }>;
   linkedin_dianne_posts: Array<{ week: string; date: string; impressions: number; reactions: number; comments: number; saves: number; followers: number; note: string }>;
   linkedin_dianne_monthly: Array<{ month: string; impressions: number; saves: number; posts: number; mom_imp: number | null; mom_saves: number | null; partial: number; note: string }>;
@@ -211,6 +212,7 @@ function DashboardContent() {
     ...rawData,
     youtube_weekly: sortByWeek(filterByWeek(rawData.youtube_weekly, range)),
     youtube_monthly: sortByMonth(filterByMonth(rawData.youtube_monthly, range)),
+    youtube_search_monthly: sortByMonth(filterByMonth(rawData.youtube_search_monthly ?? [], range)),
     youtube_videos: sortByDate(filterByDate(rawData.youtube_videos, range, "published"), "published"),
     shorts_weekly: sortByWeek(filterByWeek(rawData.shorts_weekly, range)),
     linkedin_dianne_posts: sortByDate(filterByDate(rawData.linkedin_dianne_posts, range, "date"), "date"),
@@ -298,6 +300,65 @@ function DashboardContent() {
             </table>
             </div>
           </div>
+
+          {/* YouTube Search — Monthly */}
+          {(() => {
+            const sm = data.youtube_search_monthly ?? [];
+            if (sm.length === 0) return null;
+            const full = sm.filter((m) => !m.partial);
+            const latestFull = full[full.length - 1];
+            const prevFull = full[full.length - 2];
+            const fullMoM = latestFull && prevFull && prevFull.views > 0
+              ? ((latestFull.views - prevFull.views) / prevFull.views) * 100
+              : null;
+            const peak = sm.reduce((a, b) => (b.views > a.views ? b : a), sm[0]);
+            return (
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
+                <div className="px-4 py-3 text-[13px] font-semibold border-b border-gray-200 flex items-center justify-between flex-wrap gap-2">
+                  <span className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-[#C0392B] inline-block" /> YouTube Search — Monthly
+                  </span>
+                  <span className="text-[11px] font-normal text-gray-500">
+                    Views from YouTube search, by calendar month · last full month{" "}
+                    {fullMoM !== null && (
+                      <span className={`font-semibold ${fullMoM >= 0 ? "text-[#1E8449]" : "text-[#C0392B]"}`}>
+                        {fullMoM >= 0 ? "▲" : "▼"} {Math.abs(fullMoM).toFixed(1)}% MoM
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div className="overflow-x-auto"><table className="w-full text-[13px]">
+                  <thead>
+                    <tr className="bg-gray-50">
+                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Month</th>
+                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Search Views</th>
+                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Daily Avg</th>
+                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">% Growth</th>
+                      <th className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">Note</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sm.map((m, i) => (
+                      <tr key={i} className={m.partial ? "bg-[#e8f8f5] border-l-[3px] border-l-[#117A65]" : m === peak ? "bg-[#fef9e7]" : ""}>
+                        <td className="px-3.5 py-2.5 font-semibold whitespace-nowrap">
+                          {m.month}{" "}
+                          {m.partial ? <span className="inline-block bg-[#2E86AB] text-white px-1.5 py-0.5 rounded text-[9px] font-bold uppercase">Partial</span> : null}
+                        </td>
+                        <td className="px-3.5 py-2.5 font-mono text-xs">{fmt(m.views)}</td>
+                        <td className="px-3.5 py-2.5 font-mono text-xs">{fmt(m.daily_avg)}</td>
+                        <td className="px-3.5 py-2.5">{m.partial ? <span className="text-gray-400 text-[11px]">&mdash;</span> : <Trend value={m.mom_pct} />}</td>
+                        <td className="px-3.5 py-2.5 text-[11px] text-gray-500 max-w-[220px]">{m.note}{m.projected ? ` Proj. full month: ~${fmt(m.projected)}` : ""}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                </div>
+                <div className="px-4 py-2.5 text-[11px] text-gray-500 border-t border-gray-100">
+                  Partial months show &mdash; for % growth (not comparable). Growth compares full calendar months only.
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Video Log */}
           {(() => {
@@ -459,7 +520,7 @@ function DashboardContent() {
 
           {/* Insights */}
           <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-3">What's driving growth</h3>
+            <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-3">What&apos;s driving growth</h3>
             <ul className="space-y-2 text-[13px] text-gray-700">
               {(() => {
                 const out: string[] = [];
@@ -588,7 +649,7 @@ function DashboardContent() {
 
           {/* Insights */}
           <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
-            <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-3">What's driving the numbers</h3>
+            <h3 className="text-[11px] font-bold uppercase tracking-wider text-gray-500 mb-3">What&apos;s driving the numbers</h3>
             <ul className="space-y-2 text-[13px] text-gray-700">
               {(() => {
                 const out: string[] = [];
