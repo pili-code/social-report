@@ -13,8 +13,12 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
   auth: { persistSession: false },
 });
 
-// Single 365-day TDP Page export (latest pull ending ~Jun 10 2026).
-const TDP_FILE = "/Users/pilitdp/Downloads/thedesignproject_content_1781117531153.xls";
+// Merge the previous long export with the latest short export. Later files
+// override overlapping daily rows so fresh data does not erase history.
+const TDP_FILES = [
+  "/Users/pilitdp/Downloads/thedesignproject_content_1781117531153.xls",
+  "/Users/pilitdp/Downloads/thedesignproject_content_1782322286254.xls",
+];
 // Only keep weeks whose START is on or after this date.
 const START_CUTOFF = new Date(Date.UTC(2025, 9, 1)); // 2025-10-01
 
@@ -39,31 +43,45 @@ function toNum(v) {
   console.log(`linkedin_tdp_weekly: deleted ${count ?? "?"} existing rows`);
 }
 
-// 2. Parse the Metrics sheet.
-const wb = XLSX.read(fs.readFileSync(TDP_FILE));
-const rows = XLSX.utils.sheet_to_json(wb.Sheets["Metrics"], { header: 1, raw: false, defval: null });
-const headerIdx = rows.findIndex((r) => r?.[0] === "Date");
-const headers = rows[headerIdx];
-const data = rows.slice(headerIdx + 1).filter((r) => r?.[0]);
+// 2. Parse Metrics sheets and merge daily rows by date.
+const dailyRows = new Map();
+for (const file of TDP_FILES) {
+  const wb = XLSX.read(fs.readFileSync(file));
+  const rows = XLSX.utils.sheet_to_json(wb.Sheets["Metrics"], { header: 1, raw: false, defval: null });
+  const headerIdx = rows.findIndex((r) => r?.[0] === "Date");
+  const headers = rows[headerIdx];
+  const data = rows.slice(headerIdx + 1).filter((r) => r?.[0]);
 
-const colExact = (name) => headers.findIndex((h) => h && String(h).trim() === name);
-const iDate = headers.findIndex((h) => h && String(h).toLowerCase() === "date");
-const iImp = colExact("Impressions (total)");
-const iClicks = colExact("Clicks (total)");
-const iReactions = colExact("Reactions (total)");
+  const colExact = (name) => headers.findIndex((h) => h && String(h).trim() === name);
+  const iDate = headers.findIndex((h) => h && String(h).toLowerCase() === "date");
+  const iImp = colExact("Impressions (total)");
+  const iClicks = colExact("Clicks (total)");
+  const iReactions = colExact("Reactions (total)");
+
+  for (const r of data) {
+    const d = new Date(r[iDate]);
+    if (isNaN(d.getTime())) continue;
+    dailyRows.set(d.toISOString().slice(0, 10), {
+      date: d,
+      impressions: iImp >= 0 ? toNum(r[iImp]) : 0,
+      clicks: iClicks >= 0 ? toNum(r[iClicks]) : 0,
+      reactions: iReactions >= 0 ? toNum(r[iReactions]) : 0,
+    });
+  }
+  console.log(`Parsed ${data.length} daily rows from ${path.basename(file)}`);
+}
 
 // 3. Group daily → weekly, filter by cutoff.
 const tdpBuckets = new Map();
-for (const r of data) {
-  const d = new Date(r[iDate]);
-  if (isNaN(d.getTime())) continue;
+for (const r of dailyRows.values()) {
+  const d = r.date;
   const weekStart = startOfWeek(d);
   if (weekStart < START_CUTOFF) continue;
   const key = weekStart.toISOString().slice(0, 10);
   const b = tdpBuckets.get(key) ?? { impressions: 0, clicks: 0, reactions: 0, start: weekStart, dates: [] };
-  if (iImp >= 0) b.impressions += toNum(r[iImp]);
-  if (iClicks >= 0) b.clicks += toNum(r[iClicks]);
-  if (iReactions >= 0) b.reactions += toNum(r[iReactions]);
+  b.impressions += r.impressions;
+  b.clicks += r.clicks;
+  b.reactions += r.reactions;
   b.dates.push(d);
   tdpBuckets.set(key, b);
 }
