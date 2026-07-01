@@ -17,7 +17,7 @@ If `$ARGUMENTS` is non-empty, treat it as the channel to start with (`youtube`, 
 | Channel | Source file pattern | Script | Tables affected |
 |---|---|---|---|
 | YouTube | `~/Downloads/Content YYYY-MM-DD_YYYY-MM-DD The Design Project.zip` | `scripts/upload-youtube.mjs` | `youtube_weekly`, `youtube_monthly`, `youtube_videos`, `shorts_weekly` |
-| LinkedIn Dianne | `~/Downloads/SinglePostAnalytics_Dianne Alter_*.xlsx` (one per post) | inline upsert + `scripts/rebuild-linkedin-monthly.mjs` | `linkedin_dianne_posts`, `linkedin_dianne_monthly` |
+| LinkedIn Dianne | `~/Downloads/SinglePostAnalytics_Dianne Alter_*.xlsx` (one per post) | `scripts/upload-linkedin-dianne-post.mjs` + `scripts/rebuild-linkedin-monthly.mjs` | `linkedin_dianne_posts`, `linkedin_dianne_monthly` |
 | LinkedIn TDP page | `~/Downloads/thedesignproject_content_*.xls` | `scripts/upload-linkedin-tdp.mjs` | `linkedin_tdp_weekly` |
 | X / Twitter | `~/Downloads/account_overview_analytics*.csv` | `scripts/upload-twitter.mjs` | `twitter_weekly` (wipes + rebuilds) |
 | Workshop signups | `~/Downloads/Sign up for our design-to-code workshop!_Submissions_*.csv` | `scripts/upload-workshop-signups.mjs` | `workshop_signups`, plus `youtube_videos.utm_slug` |
@@ -34,7 +34,7 @@ For each channel the user wants to update:
    - `upload-twitter.mjs` has `const CSV_FILE = "..."` — point at the new CSV.
    - `upload-linkedin-tdp.mjs` has the file path inside `parseTDP(...)` — update there.
    - `upload-workshop-signups.mjs` has `const CSV_FILE = "..."`.
-   - For LinkedIn Dianne, there is no canonical script; use the inline upsert pattern below.
+   - For LinkedIn Dianne, ask for a short topic tag and optional content note, then run `node scripts/upload-linkedin-dianne-post.mjs <file> <topic_tag> <content_note>`.
 4. **Unzip if it's a `.zip`** to a folder of the same name.
 5. **Run the script** with `node scripts/<name>.mjs`.
 6. **Verify the output** — print row counts, look for new vs upserted ratio.
@@ -91,46 +91,24 @@ Apr 2026 in DB should match YouTube Studio → Channel analytics → Last 28 day
 ```
 If they diverge by more than ~1%, investigate.
 
-## LinkedIn Dianne — inline upsert (no canonical script)
+## LinkedIn Dianne — post upsert
 
 Each post is its own xlsx file. Sheet name is `Post analytics`. Pattern:
 
 ```bash
-node --input-type=module -e "
-import dotenv from 'dotenv'; import path from 'node:path';
-dotenv.config({ path: path.join(process.cwd(), '.env.local') });
-import('@supabase/supabase-js').then(async ({ createClient }) => {
-  const XLSX = (await import('xlsx')).default;
-  const fs = await import('node:fs');
-  const sb = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false }});
-  const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const fmtDay = d => MONTHS[d.getUTCMonth()] + ' ' + d.getUTCDate();
-  const startOfWeek = d => { const o = new Date(d); o.setUTCDate(o.getUTCDate() - o.getUTCDay()); o.setUTCHours(0,0,0,0); return o; };
-  const weekLabel = d => { const s = startOfWeek(d); const e = new Date(s); e.setUTCDate(e.getUTCDate()+6); return fmtDay(s) + '–' + fmtDay(e) + ', ' + s.getUTCFullYear(); };
-  const toNum = v => v == null || v === '' ? 0 : Number(String(v).replace(/,/g,'')) || 0;
-
-  const file = '<PASTE_FILE_PATH_HERE>';
-  const wb = XLSX.read(fs.readFileSync(file));
-  const rows = XLSX.utils.sheet_to_json(wb.Sheets['Post analytics'], { header: 1, raw: false, defval: null });
-  const kv = new Map();
-  for (const r of rows) if (r?.[0]) kv.set(String(r[0]).trim(), r[1]);
-
-  const d = new Date(kv.get('Post Date'));
-  const row = {
-    week: weekLabel(d), date: d.toISOString().slice(0,10),
-    post_time: String(kv.get('Post Publish Time') ?? '').trim(),
-    impressions: toNum(kv.get('Impressions')), reactions: toNum(kv.get('Reactions')),
-    comments: toNum(kv.get('Comments')), reposts: toNum(kv.get('Reposts')),
-    saves: toNum(kv.get('Saves')), followers: toNum(kv.get('Followers gained from this post')),
-    note: '',
-  };
-  console.log(row);
-  const { error } = await sb.from('linkedin_dianne_posts').upsert(row, { onConflict: 'week,date' });
-  if (error) throw error;
-  console.log('Upserted');
-});
-"
+node scripts/upload-linkedin-dianne-post.mjs \
+  "/Users/pilitdp/Downloads/SinglePostAnalytics_Dianne Alter_....xlsx" \
+  "ai product design" \
+  "Short note about what the post argues or promotes"
 ```
+
+The script stores:
+- `topic_tag`, `content_note`, and `post_url`
+- impressions
+- members reached (shown as views/reach in the dashboard)
+- social engagements
+- engagement rate
+- reactions, comments, reposts, saves, sends, link engagements, premium button engagements, and followers
 
 After upserting any new posts, **always** run `node scripts/rebuild-linkedin-monthly.mjs` to refresh `linkedin_dianne_monthly` MoM percentages.
 

@@ -5,7 +5,7 @@ const TABLE_SCHEMAS: Record<string, { columns: string[]; channel: string }> = {
   youtube_monthly: { columns: ["month", "views", "days", "daily_avg", "mom_pct", "note"], channel: "YouTube Monthly" },
   youtube_videos: { columns: ["published", "title", "views", "impressions", "ctr", "subs", "note"], channel: "YouTube Videos" },
   shorts_weekly: { columns: ["week", "clips", "total_views", "avg_per_clip", "impressions", "note"], channel: "Shorts Weekly" },
-  linkedin_dianne_posts: { columns: ["week", "date", "post_time", "impressions", "reactions", "comments", "reposts", "saves", "followers", "note"], channel: "LinkedIn: Dianne Posts" },
+  linkedin_dianne_posts: { columns: ["week", "date", "post_time", "post_url", "topic_tag", "content_note", "impressions", "members_reached", "social_engagements", "engagement_rate", "reactions", "comments", "reposts", "saves", "followers", "sends", "link_engagements", "premium_button_engagements", "note"], channel: "LinkedIn: Dianne Posts" },
   linkedin_dianne_monthly: { columns: ["month", "impressions", "saves", "posts", "mom_imp", "mom_saves", "note"], channel: "LinkedIn: Dianne Monthly" },
   linkedin_tdp_weekly: { columns: ["week", "impressions", "clicks", "ctr", "reactions", "note"], channel: "LinkedIn: TDP Weekly" },
   cold_email_campaigns: { columns: ["campaign", "status", "window", "sent", "contacted", "replies", "reply_rate", "interested", "note"], channel: "Cold Email" },
@@ -39,7 +39,7 @@ Available tables:
 - youtube_monthly: month, views, days, daily_avg, mom_pct
 - youtube_videos: published, title, views, impressions, ctr, subs
 - shorts_weekly: week, clips, total_views, avg_per_clip, impressions
-- linkedin_dianne_posts: week, date, post_time, impressions, reactions, comments, reposts, saves, followers
+- linkedin_dianne_posts: week, date, post_time, post_url, topic_tag, content_note, impressions, members_reached, social_engagements, engagement_rate, reactions, comments, reposts, saves, followers, sends, link_engagements, premium_button_engagements
 - linkedin_dianne_monthly: month, impressions, saves, posts, mom_imp, mom_saves
 - linkedin_tdp_weekly: week, impressions, clicks, ctr, reactions
 - cold_email_campaigns: campaign, status, window, sent, contacted, replies, reply_rate, interested
@@ -82,7 +82,7 @@ Target table schemas:
 - youtube_monthly: month, views, days, daily_avg, mom_pct
 - youtube_videos: published, title, views, impressions, ctr, subs
 - shorts_weekly: week, clips, total_views, avg_per_clip, impressions
-- linkedin_dianne_posts: week, date, post_time, impressions, reactions, comments, reposts, saves, followers
+- linkedin_dianne_posts: week, date, post_time, post_url, topic_tag, content_note, impressions, members_reached, social_engagements, engagement_rate, reactions, comments, reposts, saves, followers, sends, link_engagements, premium_button_engagements
 - linkedin_dianne_monthly: month, impressions, saves, posts, mom_imp, mom_saves
 - linkedin_tdp_weekly: week, impressions, clicks, ctr, reactions
 - cold_email_campaigns: campaign, status, window, sent, contacted, replies, reply_rate, interested
@@ -154,7 +154,7 @@ export async function analyzeRows(rows: Record<string, unknown>[], filename: str
   const durationKey = findDurationKey(headers);
   const isYoutubeLongTarget = decision.table === "youtube_videos" || decision.table === "youtube_weekly";
   let longFormRows = workingRows;
-  let shortRows: Record<string, unknown>[] = [];
+  const shortRows: Record<string, unknown>[] = [];
 
   if (durationKey && isYoutubeLongTarget) {
     longFormRows = [];

@@ -27,7 +27,27 @@ interface DataSet {
   youtube_videos: Array<{ published: string; title: string; views: number; impressions: number; ctr: number; subs: number; note: string; utm_slug: string | null }>;
   youtube_search_monthly: Array<{ month: string; views: number; days: number; daily_avg: number; mom_pct: number | null; partial: number; projected: number | null; note: string }>;
   shorts_weekly: Array<{ week: string; clips: number; total_views: number; avg_per_clip: number; impressions: number; note: string }>;
-  linkedin_dianne_posts: Array<{ week: string; date: string; impressions: number; reactions: number; comments: number; saves: number; followers: number; note: string }>;
+  linkedin_dianne_posts: Array<{
+    week: string;
+    date: string;
+    post_time?: string;
+    post_url?: string;
+    topic_tag?: string;
+    content_note?: string;
+    impressions: number;
+    members_reached?: number;
+    social_engagements?: number;
+    engagement_rate?: number;
+    reactions: number;
+    comments: number;
+    reposts?: number;
+    saves: number;
+    followers: number;
+    sends?: number;
+    link_engagements?: number;
+    premium_button_engagements?: number;
+    note: string;
+  }>;
   linkedin_dianne_monthly: Array<{ month: string; impressions: number; saves: number; posts: number; mom_imp: number | null; mom_saves: number | null; partial: number; note: string }>;
   linkedin_tdp_weekly: Array<{ week: string; impressions: number; clicks: number; ctr: number; reactions: number; note: string }>;
   cold_email_campaigns: Array<{ campaign: string; status: string; window: string; sent: number; contacted: number; replies: number; reply_rate: number; interested: number; note: string }>;
@@ -233,6 +253,66 @@ function DashboardContent() {
     return d.getUTCMonth() === MONTHS.indexOf(name) && d.getUTCFullYear() === parseInt(year);
   };
   const dianneThisMonth = data.linkedin_dianne_posts.filter((p) => dateInMonth(p.date));
+  const dianneMonthlyGrowth = (() => {
+    const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    type DianneMonthlyGrowth = {
+      month: string;
+      impressions: number;
+      members_reached: number;
+      social_engagements: number;
+      engagement_rate: number;
+      saves: number;
+      followers: number;
+      posts: number;
+      mom_imp: number | null;
+      mom_reach: number | null;
+      mom_eng: number | null;
+      mom_saves: number | null;
+      mom_followers: number | null;
+    };
+    const buckets = new Map<string, Omit<DianneMonthlyGrowth, "mom_imp" | "mom_reach" | "mom_eng" | "mom_saves" | "mom_followers">>();
+    for (const p of data.linkedin_dianne_posts) {
+      const d = new Date(p.date);
+      if (isNaN(d.getTime())) continue;
+      const month = `${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+      const b = buckets.get(month) ?? {
+        month,
+        impressions: 0,
+        members_reached: 0,
+        social_engagements: 0,
+        engagement_rate: 0,
+        saves: 0,
+        followers: 0,
+        posts: 0,
+      };
+      b.impressions += p.impressions || 0;
+      b.members_reached += p.members_reached || 0;
+      b.social_engagements += p.social_engagements ?? p.reactions ?? 0;
+      b.saves += p.saves || 0;
+      b.followers += p.followers || 0;
+      b.posts += 1;
+      buckets.set(month, b);
+    }
+    const rows = [...buckets.values()]
+      .sort((a, b) => (parseMonth(a.month)?.getTime() ?? 0) - (parseMonth(b.month)?.getTime() ?? 0))
+      .map((row) => ({
+        ...row,
+        engagement_rate: row.impressions > 0 ? Math.round((row.social_engagements / row.impressions) * 10000) / 100 : 0,
+      }));
+    const mom = (current: number, previous: number | null) =>
+      previous && previous > 0 ? Math.round(((current - previous) / previous) * 1000) / 10 : null;
+    return rows.map((row, i) => {
+      const prev = i > 0 ? rows[i - 1] : null;
+      return {
+        ...row,
+        mom_imp: mom(row.impressions, prev?.impressions ?? null),
+        mom_reach: mom(row.members_reached, prev?.members_reached ?? null),
+        mom_eng: mom(row.social_engagements, prev?.social_engagements ?? null),
+        mom_saves: mom(row.saves, prev?.saves ?? null),
+        mom_followers: mom(row.followers, prev?.followers ?? null),
+      };
+    });
+  })();
 
   return (
     <div>
@@ -505,10 +585,20 @@ function DashboardContent() {
                       <span className="text-[10px] text-gray-400">{(p as { post_time?: string }).post_time}</span>
                     </div>
                     <div className="font-mono text-lg font-bold mb-1.5">{fmt(p.impressions)} <span className="text-[11px] text-gray-500 font-sans font-normal">imp</span></div>
+                    {(p.topic_tag || p.content_note) && (
+                      <div className="text-[11px] text-gray-600 mb-1.5">
+                        {p.topic_tag && <span className="font-semibold">{p.topic_tag}</span>}
+                        {p.topic_tag && p.content_note ? " · " : ""}
+                        {p.content_note}
+                      </div>
+                    )}
                     <div className="flex gap-3 text-[11px] text-gray-600">
+                      <span><strong>{p.social_engagements ?? p.reactions}</strong> eng</span>
+                      <span><strong>{p.engagement_rate ?? 0}%</strong> ER</span>
                       <span><strong>{p.reactions}</strong> react</span>
                       <span><strong>{p.saves}</strong> saves</span>
                       <span><strong>{(p as { comments?: number }).comments ?? 0}</strong> cmts</span>
+                      <span><strong>{p.reposts ?? 0}</strong> reposts</span>
                       <span>+<strong>{p.followers}</strong> foll.</span>
                     </div>
                     <div className="text-[11px] text-gray-500 mt-1.5 italic">{p.note || "—"}</div>
@@ -570,7 +660,7 @@ function DashboardContent() {
             <div className="overflow-x-auto"><table className="w-full text-[13px]">
               <thead>
                 <tr className="bg-gray-50">
-                  {["Week", "Date", "Impressions", "Reactions", "Saves", "Followers", "Note"].map(h => (
+                  {["Week", "Date", "Topic", "Impressions", "Views / Reach", "Engagements", "Eng. Rate", "Reactions", "Comments", "Saves", "Reposts", "Followers", "Note"].map(h => (
                     <th key={h} className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">{h}</th>
                   ))}
                 </tr>
@@ -582,9 +672,18 @@ function DashboardContent() {
                     <tr key={i} className={`${p.saves >= 100 ? "bg-[#D5F5E3]" : ""} ${isCurrent ? "bg-[#e8f8f5]" : ""}`}>
                       <td className="px-3.5 py-2.5">{p.week}</td>
                       <td className="px-3.5 py-2.5">{p.date}</td>
+                      <td className="px-3.5 py-2.5 text-[11px] min-w-[180px]">
+                        <div className="font-semibold text-gray-700">{p.topic_tag || "—"}</div>
+                        {p.content_note && <div className="text-gray-500 mt-0.5">{p.content_note}</div>}
+                      </td>
                       <td className="px-3.5 py-2.5 font-mono text-xs">{fmt(p.impressions)}</td>
+                      <td className="px-3.5 py-2.5 font-mono text-xs">{fmt(p.members_reached ?? 0)}</td>
+                      <td className="px-3.5 py-2.5 font-mono text-xs">{fmt(p.social_engagements ?? p.reactions)}</td>
+                      <td className="px-3.5 py-2.5 font-mono text-xs">{p.engagement_rate ?? 0}%</td>
                       <td className="px-3.5 py-2.5 font-mono text-xs">{p.reactions}</td>
+                      <td className="px-3.5 py-2.5 font-mono text-xs">{p.comments ?? 0}</td>
                       <td className="px-3.5 py-2.5 font-mono text-xs font-bold">{p.saves}</td>
+                      <td className="px-3.5 py-2.5 font-mono text-xs">{p.reposts ?? 0}</td>
                       <td className="px-3.5 py-2.5 font-mono text-xs">{p.followers}</td>
                       <td className="px-3.5 py-2.5 text-[11px] text-gray-500 max-w-[200px]">{p.note}</td>
                     </tr>
@@ -595,31 +694,40 @@ function DashboardContent() {
             </div>
           </div>
 
-          {/* Monthly Summary */}
+          {/* Monthly Growth */}
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
-            <div className="px-4 py-3 text-[13px] font-semibold border-b border-gray-200">Monthly Summary</div>
+            <div className="px-4 py-3 text-[13px] font-semibold border-b border-gray-200">Monthly Growth</div>
             <div className="overflow-x-auto"><table className="w-full text-[13px]">
               <thead>
                 <tr className="bg-gray-50">
-                  {["Month", "Impressions", "Saves", "Posts", "Imp. MoM", "Saves MoM", "Note"].map(h => (
+                  {["Month", "Posts", "Impressions", "Imp. MoM", "Views / Reach", "Reach MoM", "Engagements", "Eng. Rate", "Eng. MoM", "Saves", "Saves MoM", "Followers", "Followers MoM"].map(h => (
                     <th key={h} className="text-left px-3.5 py-2.5 text-[11px] uppercase tracking-wider text-gray-500 font-semibold">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {data.linkedin_dianne_monthly.map((m, i) => (
-                  <tr key={i} className={m.partial ? "bg-[#e8f8f5]" : ""}>
-                    <td className="px-3.5 py-2.5 font-semibold">{m.month} {m.partial ? <span className="inline-block bg-[#2E86AB] text-white px-1.5 py-0.5 rounded text-[9px] font-bold uppercase">Partial</span> : null}</td>
-                    <td className="px-3.5 py-2.5 font-mono text-xs">{fmt(m.impressions)}</td>
-                    <td className="px-3.5 py-2.5 font-mono text-xs font-bold">{fmt(m.saves)}</td>
+                {dianneMonthlyGrowth.map((m, i) => (
+                  <tr key={i}>
+                    <td className="px-3.5 py-2.5 font-semibold whitespace-nowrap">{m.month}</td>
                     <td className="px-3.5 py-2.5 font-mono text-xs">{m.posts}</td>
+                    <td className="px-3.5 py-2.5 font-mono text-xs">{fmt(m.impressions)}</td>
                     <td className="px-3.5 py-2.5"><Trend value={m.mom_imp} /></td>
+                    <td className="px-3.5 py-2.5 font-mono text-xs">{fmt(m.members_reached)}</td>
+                    <td className="px-3.5 py-2.5"><Trend value={m.mom_reach} /></td>
+                    <td className="px-3.5 py-2.5 font-mono text-xs">{fmt(m.social_engagements)}</td>
+                    <td className="px-3.5 py-2.5 font-mono text-xs">{m.engagement_rate}%</td>
+                    <td className="px-3.5 py-2.5"><Trend value={m.mom_eng} /></td>
+                    <td className="px-3.5 py-2.5 font-mono text-xs font-bold">{fmt(m.saves)}</td>
                     <td className="px-3.5 py-2.5"><Trend value={m.mom_saves} /></td>
-                    <td className="px-3.5 py-2.5 text-[11px] text-gray-500 max-w-[200px]">{m.note}</td>
+                    <td className="px-3.5 py-2.5 font-mono text-xs">{fmt(m.followers)}</td>
+                    <td className="px-3.5 py-2.5"><Trend value={m.mom_followers} /></td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            </div>
+            <div className="px-4 py-2.5 text-[11px] text-gray-500 border-t border-gray-100">
+              Growth is calculated from Dianne post-level exports. Views / reach uses LinkedIn&apos;s members reached field.
             </div>
           </div>
         </div>

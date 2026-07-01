@@ -73,16 +73,35 @@ create table if not exists linkedin_dianne_posts (
   week text not null,
   date text not null,
   post_time text default '',
+  post_url text default '',
+  topic_tag text default '',
+  content_note text default '',
   impressions integer not null,
+  members_reached integer default 0,
+  social_engagements integer default 0,
+  engagement_rate double precision default 0,
   reactions integer default 0,
   comments integer default 0,
   reposts integer default 0,
   saves integer default 0,
   followers integer default 0,
+  sends integer default 0,
+  link_engagements integer default 0,
+  premium_button_engagements integer default 0,
   note text default '',
   created_at timestamptz default now(),
   unique(week, date)
 );
+
+alter table linkedin_dianne_posts add column if not exists post_url text default '';
+alter table linkedin_dianne_posts add column if not exists topic_tag text default '';
+alter table linkedin_dianne_posts add column if not exists content_note text default '';
+alter table linkedin_dianne_posts add column if not exists members_reached integer default 0;
+alter table linkedin_dianne_posts add column if not exists social_engagements integer default 0;
+alter table linkedin_dianne_posts add column if not exists engagement_rate double precision default 0;
+alter table linkedin_dianne_posts add column if not exists sends integer default 0;
+alter table linkedin_dianne_posts add column if not exists link_engagements integer default 0;
+alter table linkedin_dianne_posts add column if not exists premium_button_engagements integer default 0;
 
 create table if not exists linkedin_dianne_monthly (
   id bigserial primary key,

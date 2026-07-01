@@ -18,6 +18,7 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 const TDP_FILES = [
   "/Users/pilitdp/Downloads/thedesignproject_content_1781117531153.xls",
   "/Users/pilitdp/Downloads/thedesignproject_content_1782322286254.xls",
+  "/Users/pilitdp/Downloads/thedesignproject_content_1782929330746.xls",
 ];
 // Only keep weeks whose START is on or after this date.
 const START_CUTOFF = new Date(Date.UTC(2025, 9, 1)); // 2025-10-01

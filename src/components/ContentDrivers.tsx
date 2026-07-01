@@ -3,7 +3,23 @@
 const fmt = (n: number) => n.toLocaleString();
 
 type Video = { published: string; title: string; views: number; impressions: number; ctr: number; subs: number; note: string };
-type DiannePost = { week: string; date: string; post_time?: string; impressions: number; reactions: number; comments?: number; reposts?: number; saves: number; followers: number; note: string };
+type DiannePost = {
+  week: string;
+  date: string;
+  post_time?: string;
+  topic_tag?: string;
+  content_note?: string;
+  impressions: number;
+  members_reached?: number;
+  social_engagements?: number;
+  engagement_rate?: number;
+  reactions: number;
+  comments?: number;
+  reposts?: number;
+  saves: number;
+  followers: number;
+  note: string;
+};
 type TDPWeek = { week: string; impressions: number; clicks: number; ctr: number; reactions: number; note: string };
 type XWeek = { week: string; impressions: number; likes: number; engagements: number; bookmarks: number; shares: number; follows: number; unfollows: number; replies: number; reposts: number; profile_visits: number; video_views: number; note: string };
 type ShortsWeek = { week: string; clips: number; total_views: number; avg_per_clip: number; impressions: number; note: string };
@@ -12,7 +28,7 @@ function Section({ title, color, children }: { title: string; color: string; chi
   return (
     <div className="bg-white rounded-xl border border-gray-200 border-l-4 p-5 mb-6" style={{ borderLeftColor: color }}>
       <h3 className="text-[11px] font-bold uppercase tracking-wider mb-4" style={{ color }}>
-        Content Drivers — What's Working
+        {title}
       </h3>
       <div className="space-y-5">{children}</div>
     </div>
@@ -104,16 +120,16 @@ export function YouTubeDrivers({ videos }: { videos: Video[] }) {
       <Insight label="Actionable Takeaways">
         <ul className="space-y-1 mt-1">
           {compounding[0] && (
-            <li>• <strong>"{compounding[0].title.slice(0, 50)}…"</strong> is your #1 asset ({fmt(compounding[0].views)} views, {Math.round(compounding[0].views / totalViews * 100)}% of total). Create follow-up content.</li>
+            <li>• <strong>&quot;{compounding[0].title.slice(0, 50)}…&quot;</strong> is your #1 asset ({fmt(compounding[0].views)} views, {Math.round(compounding[0].views / totalViews * 100)}% of total). Create follow-up content.</li>
           )}
           {topicStats[0] && (
-            <li>• Topic <strong>"{topicStats[0].keyword}"</strong> drives {fmt(topicStats[0].totalViews)} views across {topicStats[0].count} videos. Double down on this.</li>
+            <li>• Topic <strong>&quot;{topicStats[0].keyword}&quot;</strong> drives {fmt(topicStats[0].totalViews)} views across {topicStats[0].count} videos. Double down on this.</li>
           )}
           {bestCTR[0] && bestCTR[0].ctr > 8 && (
-            <li>• <strong>{bestCTR[0].ctr}% CTR</strong> on "{bestCTR[0].title.slice(0, 40)}…" means the thumbnail/title works — study what makes it click.</li>
+            <li>• <strong>{bestCTR[0].ctr}% CTR</strong> on &quot;{bestCTR[0].title.slice(0, 40)}…&quot; means the thumbnail/title works — study what makes it click.</li>
           )}
           {topicStats.length > 1 && topicStats[1].avgCTR > topicStats[0].avgCTR && (
-            <li>• <strong>"{topicStats[1].keyword}"</strong> has higher CTR ({topicStats[1].avgCTR}%) than "{topicStats[0].keyword}" ({topicStats[0].avgCTR}%) — consider combining both topics.</li>
+            <li>• <strong>&quot;{topicStats[1].keyword}&quot;</strong> has higher CTR ({topicStats[1].avgCTR}%) than &quot;{topicStats[0].keyword}&quot; ({topicStats[0].avgCTR}%) — consider combining both topics.</li>
           )}
         </ul>
       </Insight>
@@ -160,7 +176,9 @@ export function DianneDrivers({ posts }: { posts: DiannePost[] }) {
               <span className="text-[10px] font-mono text-gray-400 mt-0.5">{i + 1}.</span>
               <div>
                 <span className="font-medium text-gray-800">{p.date}</span>
+                {p.topic_tag && <span className="text-[11px] text-gray-600 ml-2 font-semibold">{p.topic_tag}</span>}
                 <span className="text-[11px] text-gray-500 ml-2">{fmt(p.saves)} saves · {fmt(p.impressions)} imp · {p.reactions} reactions · +{p.followers} followers</span>
+                {p.engagement_rate !== undefined && <span className="text-[11px] text-gray-500 ml-2">{p.engagement_rate}% ER</span>}
                 {p.note && <span className="text-[10px] italic text-gray-400 ml-1">({p.note})</span>}
                 {p.impressions > avgImp * 2 && <Badge color="#C0392B">breakout</Badge>}
               </div>
@@ -269,7 +287,7 @@ export function TDPDrivers({ weeks }: { weeks: TDPWeek[] }) {
       <Insight label="Actionable Takeaways">
         <ul className="space-y-1 mt-1">
           <li>• <strong>Post every week</strong> — {Math.round(avgWithPost / Math.max(avgWithout, 1))}× impression lift when you do.</li>
-          {sorted[0]?.note && <li>• Best post type: <strong>"{sorted[0].note}"</strong> ({fmt(sorted[0].impressions)} imp). Create more of this format.</li>}
+          {sorted[0]?.note && <li>• Best post type: <strong>&quot;{sorted[0].note}&quot;</strong> ({fmt(sorted[0].impressions)} imp). Create more of this format.</li>}
           {weeks.filter((w) => w.ctr > 30).length > 0 && <li>• High CTR ({">"}30%) indicates a small but engaged audience — focus on growing page followers.</li>}
         </ul>
       </Insight>
@@ -368,7 +386,7 @@ export function ShortsDrivers({ weeks }: { weeks: ShortsWeek[] }) {
             {withNotes.sort((a, b) => b.avg_per_clip - a.avg_per_clip).slice(0, 3).map((w, i) => (
               <div key={i} className="text-[11px]">
                 <Badge color="#E67E22">{fmt(w.avg_per_clip)}/clip</Badge>
-                <span>"{w.note}" — {w.week}</span>
+                <span>&quot;{w.note}&quot; — {w.week}</span>
               </div>
             ))}
           </div>
